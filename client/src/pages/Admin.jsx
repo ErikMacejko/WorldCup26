@@ -194,6 +194,16 @@ function ResultRow({ match, onSaved }) {
     }
   }
 
+  async function toggleLock() {
+    setBusy(true);
+    try {
+      await api.admin.toggleLock(match.id);
+      onSaved();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <tr className={match.status === 'finished' ? 'finished' : ''}>
       <td>{match.matchNumber}</td>
@@ -213,6 +223,15 @@ function ResultRow({ match, onSaved }) {
         <input type="number" min="0" className="mini" value={away} onChange={(e) => setAway(e.target.value)} />
       </td>
       <td>
+        {match.adminUnlocked ? (
+          <span className="tag warn">odomknuté</span>
+        ) : match.locked ? (
+          <span className="tag">zamknuté</span>
+        ) : (
+          <span className="muted small">otvorené</span>
+        )}
+      </td>
+      <td>
         <button className="btn-sm" disabled={busy || home === '' || away === ''} onClick={save}>
           Uložiť
         </button>
@@ -221,6 +240,9 @@ function ResultRow({ match, onSaved }) {
             Zmazať
           </button>
         )}
+        <button className="btn-sm" disabled={busy} onClick={toggleLock}>
+          {match.adminUnlocked ? 'Zamknúť' : 'Odomknúť'}
+        </button>
       </td>
     </tr>
   );
@@ -248,6 +270,7 @@ function ResultsTab() {
             <th>Výkop</th>
             <th>Zápas</th>
             <th>Výsledok</th>
+            <th>Tipovanie</th>
             <th></th>
           </tr>
         </thead>

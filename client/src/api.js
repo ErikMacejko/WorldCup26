@@ -66,6 +66,7 @@ export const api = {
         body: JSON.stringify({ home, away }),
       }),
     clearResult: (id) => req(`/admin/matches/${id}/result`, { method: 'DELETE' }),
+    toggleLock: (id) => req(`/admin/matches/${id}/toggle-lock`, { method: 'POST' }),
     deletePrediction: (userId, matchId) =>
       req(`/admin/users/${userId}/predictions/${matchId}`, { method: 'DELETE' }),
   },

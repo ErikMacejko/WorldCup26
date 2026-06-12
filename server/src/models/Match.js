@@ -27,13 +27,18 @@ const matchSchema = new mongoose.Schema(
       home: { type: Number, default: null },
       away: { type: Number, default: null },
     },
+    // Admin override that re-opens predictions past the normal time-based
+    // lock (e.g. to let someone back-fill a missed tip). Toggled off again
+    // to re-lock.
+    adminUnlocked: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
 // True once betting is locked (30 min before kickoff by default) — at this point
-// other players' tips also become visible.
+// other players' tips also become visible. An admin can temporarily lift this.
 matchSchema.methods.isLocked = function (now = new Date()) {
+  if (this.adminUnlocked) return false;
   return now.getTime() >= this.kickoff.getTime() - LOCK_MS;
 };
 
@@ -55,6 +60,7 @@ matchSchema.methods.toClient = function (now = new Date()) {
         ? { home: this.result.home, away: this.result.away }
         : null,
     locked: this.isLocked(now),
+    adminUnlocked: this.adminUnlocked,
   };
 };
 

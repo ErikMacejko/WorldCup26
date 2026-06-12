@@ -86,9 +86,7 @@ function MatchCard({ match, myPred, onSaved }) {
   }, [myPred?.homeScore, myPred?.awayScore]);
 
   const locked = match.locked;
-  // A locked match still accepts a *first* tip (back-fill for players who
-  // join later) — only editing an existing tip is blocked once locked.
-  const editable = !locked || !myPred;
+  const editable = !locked;
 
   // Only allow 0-99 (at most two digits) while typing.
   function handleScoreChange(setter) {
@@ -158,9 +156,13 @@ function MatchCard({ match, myPred, onSaved }) {
             </div>
           ) : (
             <div className="locked-score">
-              <span className="my-tip">
-                {myPred.homeScore} : {myPred.awayScore}
-              </span>
+              {myPred ? (
+                <span className="my-tip">
+                  {myPred.homeScore} : {myPred.awayScore}
+                </span>
+              ) : (
+                <span className="my-tip muted">bez tipu</span>
+              )}
             </div>
           )}
         </div>
@@ -177,11 +179,10 @@ function MatchCard({ match, myPred, onSaved }) {
       <div className="match-footer">
         {editable ? (
           <div className="save-row">
-            {locked && (
+            {match.result && (
               <span className="muted small">
-                Zápas už skončil
-                {match.result ? ` (${match.result.home}:${match.result.away})` : ''}
-                {' '}— doplň svoj pôvodný tip:
+                Zápas už skončil ({match.result.home}:{match.result.away}) — admin ti
+                dočasne odomkol tipovanie, tip sa ihneď ohodnotí podľa výsledku:
               </span>
             )}
             <button className="btn-sm" onClick={save} disabled={saving}>

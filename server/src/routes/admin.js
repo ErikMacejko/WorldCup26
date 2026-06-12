@@ -117,10 +117,9 @@ router.post('/users/:id/toggle-hide', async (req, res) => {
   res.json({ id: user._id.toString(), hiddenFromLeaderboard: user.hiddenFromLeaderboard });
 });
 
-// Delete a single tip of a player (e.g. they back-filled it wrong for an
-// already-played match and can't edit it themselves once locked). After this,
-// the normal PUT /predictions/:matchId route treats it as a fresh tip again
-// and accepts a new one even though the match is locked/finished.
+// Delete a single tip of a player (e.g. they entered it wrong and the match
+// is locked so they can't fix it themselves). Combine with unlocking the
+// match if they also need to resubmit.
 router.delete('/users/:id/predictions/:matchId', async (req, res) => {
   const pred = await Prediction.findOneAndDelete({
     user: req.params.id,
@@ -176,6 +175,16 @@ router.delete('/matches/:id/result', async (req, res) => {
   match.status = 'scheduled';
   await match.save();
   await rescoreMatch(match);
+  res.json(match.toClient());
+});
+
+// Toggle the admin override that re-opens predictions for this match past
+// the normal time-based lock. Call again to re-lock it.
+router.post('/matches/:id/toggle-lock', async (req, res) => {
+  const match = await Match.findById(req.params.id);
+  if (!match) return res.status(404).json({ error: 'not_found' });
+  match.adminUnlocked = !match.adminUnlocked;
+  await match.save();
   res.json(match.toClient());
 });
 

@@ -29,10 +29,9 @@ function parseScore(v) {
   return n;
 }
 
-// Create or update a prediction for a match. Editing is only allowed while
-// the match is not locked (more than 30 min before kickoff) — but a *first*
-// tip is still accepted for an already-locked match, so players who join
-// later can back-fill their tip for matches played before they registered.
+// Create or update a prediction for a match. Only allowed while the match is
+// not locked (more than 30 min before kickoff), unless an admin has manually
+// unlocked it again (e.g. to let someone back-fill a missed tip).
 router.put('/:matchId', requireAuth, requireNickname, async (req, res) => {
   const homeScore = parseScore(req.body?.homeScore);
   const awayScore = parseScore(req.body?.awayScore);
@@ -43,8 +42,7 @@ router.put('/:matchId', requireAuth, requireNickname, async (req, res) => {
   const match = await Match.findById(req.params.matchId);
   if (!match) return res.status(404).json({ error: 'match_not_found' });
 
-  const existing = await Prediction.findOne({ user: req.user._id, match: match._id });
-  if (match.isLocked() && existing) {
+  if (match.isLocked()) {
     return res.status(423).json({ error: 'locked' });
   }
 
