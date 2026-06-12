@@ -189,6 +189,7 @@ h2 { margin-top: 0; }
 .rules-content p { margin: 0.4rem 0; }
 .rules-content ul { margin: 0.4rem 0; padding-left: 1.2rem; }
 .rules-content li { margin: 0.2rem 0; }
+.rules-warning { color: #e5484d; font-weight: 600; }
 
 .others { margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.4rem; }
 .others-list { margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.2rem; }

@@ -18,7 +18,7 @@ function Rules() {
             <li><strong>1 bod</strong> – trafený počet gólov jedného z tímov</li>
           </ul>
           <p>Body za víťaza a za počet gólov sa sčítavajú (max. 2 body, ak nejde o presný výsledok).</p>
-          <p>Tip môžeš meniť až do výkopu zápasu, potom sa uzamkne.</p>
+          <p className="rules-warning">Tip môžeš meniť len do <strong>30 minút pred výkopom</strong> zápasu, potom sa uzamkne a zobrazia sa tipy ostatných hráčov.</p>
         </div>
       )}
     </div>
