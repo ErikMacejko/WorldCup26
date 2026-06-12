@@ -1,5 +1,8 @@
 server {
-  listen 80;
+  # Railway (and similar platforms) inject PORT and expect the container to
+  # listen on it; the official nginx image's entrypoint runs envsubst on
+  # *.template files in /etc/nginx/templates, substituting ${PORT} here.
+  listen ${PORT};
   server_name _;
   root /usr/share/nginx/html;
   index index.html;
