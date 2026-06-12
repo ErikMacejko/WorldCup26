@@ -45,7 +45,10 @@ router.get(
     const token = signToken(req.user);
     setAuthCookie(res, token);
     const dest = req.user.nickname ? '/' : '/nickname';
-    res.redirect(`${config.clientUrl}${dest}`);
+    // Also pass the token via the URL so the client can store it and send it
+    // as a Bearer header — the cookie alone won't reach the API on a
+    // different *.up.railway.app subdomain due to cookie partitioning.
+    res.redirect(`${config.clientUrl}${dest}?token=${token}`);
   }
 );
 

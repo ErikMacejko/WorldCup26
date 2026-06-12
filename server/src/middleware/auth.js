@@ -26,10 +26,15 @@ export function clearAuthCookie(res) {
   res.clearCookie(COOKIE_NAME);
 }
 
-// Loads the user from the JWT cookie and attaches it as req.user.
+// Loads the user from the JWT (cookie or Authorization header) and attaches
+// it as req.user. The header is the primary mechanism: client and server run
+// on different *.up.railway.app subdomains, which browsers treat as separate
+// sites and partition cookies between (so the cookie often isn't sent).
 export async function requireAuth(req, res, next) {
   try {
-    const token = req.cookies?.[COOKIE_NAME];
+    const authHeader = req.headers.authorization || '';
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const token = bearer || req.cookies?.[COOKIE_NAME];
     if (!token) return res.status(401).json({ error: 'not_authenticated' });
 
     const payload = jwt.verify(token, config.jwtSecret);

@@ -1,10 +1,17 @@
 const API = import.meta.env.VITE_API_URL || '/api';
 
+export const TOKEN_KEY = 'wc26_token';
+
 async function req(path, opts = {}) {
+  const token = localStorage.getItem(TOKEN_KEY);
   const res = await fetch(`${API}${path}`, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
     ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...opts.headers,
+    },
   });
   if (!res.ok) {
     let body = {};
@@ -29,7 +36,13 @@ export const api = {
   me: () => req('/auth/me'),
   setNickname: (nickname) =>
     req('/auth/nickname', { method: 'POST', body: JSON.stringify({ nickname }) }),
-  logout: () => req('/auth/logout', { method: 'POST' }),
+  logout: async () => {
+    try {
+      await req('/auth/logout', { method: 'POST' });
+    } finally {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  },
 
   matches: () => req('/matches'),
   myPredictions: () => req('/predictions/mine'),
