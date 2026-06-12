@@ -1,0 +1,41 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    # Expose locally if you want to inspect the DB; not required for the app.
+    ports:
+      - '27017:27017'
+
+  server:
+    build: ./server
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      PORT: 4000
+      MONGO_URI: mongodb://mongo:27017/worldcup26
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # Browser-facing URL (nginx). OAuth redirects + CORS use this.
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:8080}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:8080/api/auth/google/callback}
+      ADMIN_EMAILS: ${ADMIN_EMAILS}
+      LOCK_MINUTES: ${LOCK_MINUTES:-30}
+      NODE_ENV: production
+    # No public port — the frontend's nginx proxies /api to it.
+    expose:
+      - '4000'
+
+  client:
+    build: ./client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - '8080:80'
+
+volumes:
+  mongo-data:
