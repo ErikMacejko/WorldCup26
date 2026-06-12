@@ -4,6 +4,11 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 COPY . .
+# If set, the built app calls the API at this URL instead of the relative
+# /api path proxied by nginx (used when client and server are deployed as
+# separate services, e.g. on Railway).
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 FROM nginx:alpine

@@ -11,10 +11,13 @@ export function signToken(user) {
 }
 
 export function setAuthCookie(res, token) {
+  const secure = process.env.NODE_ENV === 'production';
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    // Client and server live on different *.up.railway.app subdomains in
+    // production, so the auth cookie must be sent cross-site.
+    sameSite: secure ? 'none' : 'lax',
+    secure,
     maxAge: 30 * 24 * 60 * 60 * 1000,
   });
 }
