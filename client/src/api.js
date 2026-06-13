@@ -65,8 +65,11 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ home, away }),
       }),
-    clearResult: (id) => req(`/admin/matches/${id}/result`, { method: 'DELETE' }),
-    toggleLock: (id) => req(`/admin/matches/${id}/toggle-lock`, { method: 'POST' }),
+    setBackfill: (id, userIds) =>
+      req(`/admin/matches/${id}/backfill`, {
+        method: 'POST',
+        body: JSON.stringify({ userIds }),
+      }),
     deletePrediction: (userId, matchId) =>
       req(`/admin/users/${userId}/predictions/${matchId}`, { method: 'DELETE' }),
   },

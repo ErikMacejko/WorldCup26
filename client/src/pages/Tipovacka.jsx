@@ -86,7 +86,9 @@ function MatchCard({ match, myPred, onSaved }) {
   }, [myPred?.homeScore, myPred?.awayScore]);
 
   const locked = match.locked;
-  const editable = !locked;
+  // An admin can grant individual players a one-shot back-fill for a locked
+  // match; submitting consumes the grant (see predictions.js).
+  const editable = !locked || match.canBackfill;
 
   // Only allow 0-99 (at most two digits) while typing.
   function handleScoreChange(setter) {
@@ -126,11 +128,11 @@ function MatchCard({ match, myPred, onSaved }) {
 
       <div className="match-teams">
         <div className="team team-home">
-          <span className="flag">{flag(match.homeTeam)}</span>
           <span className="team-name">
             <span className="cc-full">{match.homeTeam}</span>
             <span className="cc-short">{teamCode(match.homeTeam)}</span>
           </span>
+          <span className="flag">{flag(match.homeTeam)}</span>
         </div>
 
         <div className="score-box">
@@ -168,33 +170,35 @@ function MatchCard({ match, myPred, onSaved }) {
         </div>
 
         <div className="team team-away">
+          <span className="flag">{flag(match.awayTeam)}</span>
           <span className="team-name">
             <span className="cc-full">{match.awayTeam}</span>
             <span className="cc-short">{teamCode(match.awayTeam)}</span>
           </span>
-          <span className="flag">{flag(match.awayTeam)}</span>
         </div>
       </div>
 
       <div className="match-footer">
         {editable ? (
-          <div className="save-row">
+          <div className="save-block">
             {match.result && (
-              <span className="muted small">
+              <div className="muted small">
                 Zápas už skončil ({match.result.home}:{match.result.away}) — admin ti
-                dočasne odomkol tipovanie, tip sa ihneď ohodnotí podľa výsledku:
-              </span>
+                dočasne odomkol tipovanie, tip sa ihneď ohodnotí podľa výsledku.
+              </div>
             )}
-            <button className="btn-sm" onClick={save} disabled={saving}>
-              {saving ? 'Ukladám…' : myPred ? 'Upraviť tip' : 'Uložiť tip'}
-            </button>
-            {savedFlash && <span className="ok">✓ uložené</span>}
-            {myPred && !savedFlash && !locked && (
-              <span className="muted small">
-                tvoj tip: {myPred.homeScore}:{myPred.awayScore}
-              </span>
-            )}
-            {error && <span className="error small">{error}</span>}
+            <div className="save-row">
+              <button className="btn-sm" onClick={save} disabled={saving}>
+                {saving ? 'Ukladám…' : myPred ? 'Upraviť tip' : 'Uložiť tip'}
+              </button>
+              {savedFlash && <span className="ok">✓ uložené</span>}
+              {myPred && !savedFlash && !locked && (
+                <span className="muted small">
+                  tvoj tip: {myPred.homeScore}:{myPred.awayScore}
+                </span>
+              )}
+              {error && <span className="error small">{error}</span>}
+            </div>
           </div>
         ) : (
           <div className="locked-info">
@@ -249,6 +253,11 @@ export default function Tipovacka() {
 
   function onSaved(matchId, saved) {
     setMine((prev) => ({ ...prev, [matchId]: saved }));
+    // A back-fill grant is consumed by the server on save — reflect that
+    // immediately so the card switches back to read-only.
+    setMatches((prev) =>
+      prev.map((m) => (m.id === matchId ? { ...m, canBackfill: false } : m))
+    );
   }
 
   if (loading) return <div className="center muted">Načítavam zápasy…</div>;

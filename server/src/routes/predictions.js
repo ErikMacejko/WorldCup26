@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { Match } from '../models/Match.js';
 import { Prediction } from '../models/Prediction.js';
-import { User } from '../models/User.js';
 import { computePoints } from '../lib/scoring.js';
 import { requireAuth, requireNickname } from '../middleware/auth.js';
 
@@ -29,9 +28,10 @@ function parseScore(v) {
   return n;
 }
 
-// Create or update a prediction for a match. Only allowed while the match is
-// not locked (more than 30 min before kickoff), unless an admin has manually
-// unlocked it again (e.g. to let someone back-fill a missed tip).
+// Create or update a prediction for a match. Normally only allowed while the
+// match is not locked (more than 30 min before kickoff). Once locked, an
+// admin can grant individual players a one-shot back-fill (match.backfillFor)
+// from the Results tab — submitting consumes that grant.
 router.put('/:matchId', requireAuth, requireNickname, async (req, res) => {
   const homeScore = parseScore(req.body?.homeScore);
   const awayScore = parseScore(req.body?.awayScore);
@@ -43,7 +43,12 @@ router.put('/:matchId', requireAuth, requireNickname, async (req, res) => {
   if (!match) return res.status(404).json({ error: 'match_not_found' });
 
   if (match.isLocked()) {
-    return res.status(423).json({ error: 'locked' });
+    const grantIdx = match.backfillFor.findIndex((id) => id.equals(req.user._id));
+    if (grantIdx === -1) {
+      return res.status(423).json({ error: 'locked' });
+    }
+    match.backfillFor.splice(grantIdx, 1);
+    await match.save();
   }
 
   // If the match is already finished, score a back-filled tip immediately

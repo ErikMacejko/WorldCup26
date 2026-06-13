@@ -141,11 +141,17 @@ router.post('/users/:id/toggle-block', async (req, res) => {
   res.json({ id: user._id.toString(), blocked: user.blocked });
 });
 
-// List matches (for result entry).
+// List matches (for result entry), including which players currently hold a
+// back-fill grant for each one.
 router.get('/matches', async (req, res) => {
   const now = new Date();
   const matches = await Match.find().sort({ kickoff: 1, matchNumber: 1 });
-  res.json(matches.map((m) => m.toClient(now)));
+  res.json(
+    matches.map((m) => ({
+      ...m.toClient(now),
+      backfillFor: m.backfillFor.map((id) => id.toString()),
+    }))
+  );
 });
 
 // Set / update the actual result of a match, then rescore all predictions.
@@ -167,25 +173,17 @@ router.put('/matches/:id/result', async (req, res) => {
   res.json(match.toClient());
 });
 
-// Clear a result (e.g. entered by mistake).
-router.delete('/matches/:id/result', async (req, res) => {
+// Replace the set of players granted a one-shot back-fill for this locked
+// match (see predictions.js). Pass an empty array to revoke all.
+router.post('/matches/:id/backfill', async (req, res) => {
   const match = await Match.findById(req.params.id);
   if (!match) return res.status(404).json({ error: 'not_found' });
-  match.result = { home: null, away: null };
-  match.status = 'scheduled';
-  await match.save();
-  await rescoreMatch(match);
-  res.json(match.toClient());
-});
 
-// Toggle the admin override that re-opens predictions for this match past
-// the normal time-based lock. Call again to re-lock it.
-router.post('/matches/:id/toggle-lock', async (req, res) => {
-  const match = await Match.findById(req.params.id);
-  if (!match) return res.status(404).json({ error: 'not_found' });
-  match.adminUnlocked = !match.adminUnlocked;
+  const userIds = Array.isArray(req.body?.userIds) ? req.body.userIds : [];
+  match.backfillFor = userIds;
   await match.save();
-  res.json(match.toClient());
+
+  res.json({ id: match._id.toString(), backfillFor: match.backfillFor.map((id) => id.toString()) });
 });
 
 export default router;

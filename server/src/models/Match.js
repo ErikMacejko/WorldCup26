@@ -27,22 +27,21 @@ const matchSchema = new mongoose.Schema(
       home: { type: Number, default: null },
       away: { type: Number, default: null },
     },
-    // Admin override that re-opens predictions past the normal time-based
-    // lock (e.g. to let someone back-fill a missed tip). Toggled off again
-    // to re-lock.
-    adminUnlocked: { type: Boolean, default: false },
+    // Players an admin has granted a one-shot back-fill for this locked
+    // match (see predictions.js). Each entry is consumed as soon as that
+    // player submits a tip; the admin can grant it again from the Results tab.
+    backfillFor: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
   { timestamps: true }
 );
 
 // True once betting is locked (30 min before kickoff by default) — at this point
-// other players' tips also become visible. An admin can temporarily lift this.
+// other players' tips become visible and normal editing stops.
 matchSchema.methods.isLocked = function (now = new Date()) {
-  if (this.adminUnlocked) return false;
   return now.getTime() >= this.kickoff.getTime() - LOCK_MS;
 };
 
-matchSchema.methods.toClient = function (now = new Date()) {
+matchSchema.methods.toClient = function (now = new Date(), userId = null) {
   return {
     id: this._id.toString(),
     matchNumber: this.matchNumber,
@@ -60,7 +59,7 @@ matchSchema.methods.toClient = function (now = new Date()) {
         ? { home: this.result.home, away: this.result.away }
         : null,
     locked: this.isLocked(now),
-    adminUnlocked: this.adminUnlocked,
+    canBackfill: userId ? this.backfillFor.some((id) => id.equals(userId)) : false,
   };
 };
 

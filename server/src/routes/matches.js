@@ -9,7 +9,7 @@ const router = Router();
 router.get('/', requireAuth, async (req, res) => {
   const now = new Date();
   const matches = await Match.find().sort({ kickoff: 1, matchNumber: 1 });
-  res.json(matches.map((m) => m.toClient(now)));
+  res.json(matches.map((m) => m.toClient(now, req.user._id)));
 });
 
 export default router;

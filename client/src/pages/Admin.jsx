@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api.js';
 import { stageLabel, flag, teamCode, fmtDateTime } from '../lib/format.js';
+
+// Only allow 0-99 (at most two digits) while typing a score.
+function handleScoreChange(setter) {
+  return (e) => {
+    const v = e.target.value;
+    if (/^[0-9]{0,2}$/.test(v)) setter(v);
+  };
+}
 
 function UserDetail({ id, onChanged }) {
   const [data, setData] = useState(null);
@@ -168,10 +177,133 @@ function UsersTab() {
   );
 }
 
-function ResultRow({ match, onSaved }) {
+// Opened via "Odomknúť" on a finished match: lets the admin correct the
+// result and/or pick which players get a one-shot back-fill for this locked
+// match. The single "Uložiť" here saves both (and replaces match.backfillFor).
+function BackfillPicker({ match, players, onClose, onSaved }) {
+  const [home, setHome] = useState(match.result?.home ?? '');
+  const [away, setAway] = useState(match.result?.away ?? '');
+  const [selected, setSelected] = useState(() => new Set(match.backfillFor));
+  const [search, setSearch] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const allSelected = players.length > 0 && selected.size === players.length;
+  const filtered = players.filter((p) =>
+    (p.nickname || p.email || '').toLowerCase().includes(search.trim().toLowerCase())
+  );
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(players.map((p) => p.id)));
+  }
+  function toggleOne(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function save() {
+    setBusy(true);
+    try {
+      await Promise.all([
+        api.admin.setResult(match.id, Number(home), Number(away)),
+        api.admin.setBackfill(match.id, [...selected]),
+      ]);
+      await onSaved();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Odomknúť dotipovanie</h3>
+          <button className="modal-close" onClick={onClose} aria-label="Zavrieť">
+            ✕
+          </button>
+        </div>
+
+        <div className="backfill-result">
+          <span className="muted small">Výsledok:</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]{1,2}"
+            maxLength={2}
+            className="mini"
+            value={home}
+            onChange={handleScoreChange(setHome)}
+          />
+          :
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]{1,2}"
+            maxLength={2}
+            className="mini"
+            value={away}
+            onChange={handleScoreChange(setAway)}
+          />
+        </div>
+
+        <input
+          type="text"
+          className="input backfill-search"
+          placeholder="Hľadať hráča…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
+        <label className="backfill-all">
+          <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+          Všetci
+        </label>
+
+        <div className="backfill-users">
+          {filtered.map((p) => (
+            <label key={p.id}>
+              <input
+                type="checkbox"
+                checked={selected.has(p.id)}
+                onChange={() => toggleOne(p.id)}
+              />
+              {p.nickname || p.email}
+            </label>
+          ))}
+          {filtered.length === 0 && <div className="muted small">žiadni hráči</div>}
+        </div>
+
+        <div className="backfill-actions">
+          <button className="btn-sm" disabled={busy || home === '' || away === ''} onClick={save}>
+            Uložiť
+          </button>
+          <button className="btn-ghost" disabled={busy} onClick={onClose}>
+            Zavrieť
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function ResultRow({ match, players, onSaved }) {
   const [home, setHome] = useState(match.result?.home ?? '');
   const [away, setAway] = useState(match.result?.away ?? '');
   const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    setHome(match.result?.home ?? '');
+    setAway(match.result?.away ?? '');
+  }, [match.result?.home, match.result?.away]);
+
+  const finished = match.status === 'finished';
 
   async function save() {
     setBusy(true);
@@ -182,77 +314,90 @@ function ResultRow({ match, onSaved }) {
       setBusy(false);
     }
   }
-  async function clear() {
-    setBusy(true);
-    try {
-      await api.admin.clearResult(match.id);
-      setHome('');
-      setAway('');
-      onSaved();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function toggleLock() {
-    setBusy(true);
-    try {
-      await api.admin.toggleLock(match.id);
-      onSaved();
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
-    <tr className={match.status === 'finished' ? 'finished' : ''}>
-      <td>{match.matchNumber}</td>
-      <td className="muted small">{fmtDateTime(match.kickoff)}</td>
-      <td>
-        {flag(match.homeTeam)}{' '}
-        <span className="cc-full">{match.homeTeam}</span>
-        <span className="cc-short">{teamCode(match.homeTeam)}</span>
-        {' – '}
-        <span className="cc-full">{match.awayTeam}</span>
-        <span className="cc-short">{teamCode(match.awayTeam)}</span>
-        {' '}{flag(match.awayTeam)}
-      </td>
-      <td>
-        <input type="number" min="0" className="mini" value={home} onChange={(e) => setHome(e.target.value)} />
-        :
-        <input type="number" min="0" className="mini" value={away} onChange={(e) => setAway(e.target.value)} />
-      </td>
-      <td>
-        {match.adminUnlocked ? (
-          <span className="tag warn">odomknuté</span>
-        ) : match.locked ? (
-          <span className="tag">zamknuté</span>
-        ) : (
-          <span className="muted small">otvorené</span>
-        )}
-      </td>
-      <td>
-        <button className="btn-sm" disabled={busy || home === '' || away === ''} onClick={save}>
-          Uložiť
-        </button>
-        {match.status === 'finished' && (
-          <button className="btn-sm warn" disabled={busy} onClick={clear}>
-            Zmazať
-          </button>
-        )}
-        <button className="btn-sm" disabled={busy} onClick={toggleLock}>
-          {match.adminUnlocked ? 'Zamknúť' : 'Odomknúť'}
-        </button>
-      </td>
-    </tr>
+    <>
+      <tr className={finished ? 'finished' : ''}>
+        <td>{match.matchNumber}</td>
+        <td className="muted small">{fmtDateTime(match.kickoff)}</td>
+        <td className="col-team col-home">
+          <span className="cc-full">{match.homeTeam}</span>
+          <span className="cc-short">{teamCode(match.homeTeam)}</span>
+        </td>
+        <td className="col-flag">{flag(match.homeTeam)}</td>
+        <td className="col-vs">
+          <span className="vs result-edit">
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{1,2}"
+              maxLength={2}
+              className="mini"
+              value={home}
+              disabled={finished}
+              onChange={handleScoreChange(setHome)}
+            />
+            :
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{1,2}"
+              maxLength={2}
+              className="mini"
+              value={away}
+              disabled={finished}
+              onChange={handleScoreChange(setAway)}
+            />
+          </span>
+        </td>
+        <td className="col-flag">{flag(match.awayTeam)}</td>
+        <td className="col-team col-away">
+          <span className="cc-full">{match.awayTeam}</span>
+          <span className="cc-short">{teamCode(match.awayTeam)}</span>
+        </td>
+        <td>
+          {!finished ? (
+            <span className="muted small">otvorené</span>
+          ) : match.backfillFor.length > 0 ? (
+            <span className="tag warn">odomknuté ({match.backfillFor.length})</span>
+          ) : (
+            <span className="tag">zamknuté</span>
+          )}
+        </td>
+        <td>
+          {finished ? (
+            <button className="btn-sm" disabled={busy} onClick={() => setPickerOpen((v) => !v)}>
+              Odomknúť
+            </button>
+          ) : (
+            <button className="btn-sm" disabled={busy || home === '' || away === ''} onClick={save}>
+              Uložiť
+            </button>
+          )}
+        </td>
+      </tr>
+      {pickerOpen && (
+        <BackfillPicker
+          match={match}
+          players={players}
+          onClose={() => setPickerOpen(false)}
+          onSaved={onSaved}
+        />
+      )}
+    </>
   );
 }
 
 function ResultsTab() {
   const [matches, setMatches] = useState([]);
+  const [players, setPlayers] = useState([]);
 
   async function load() {
-    setMatches(await api.admin.matches());
+    const [ms, us] = await Promise.all([api.admin.matches(), api.admin.users()]);
+    setMatches(ms);
+    setPlayers(
+      us.filter((u) => u.nickname).sort((a, b) => a.nickname.localeCompare(b.nickname))
+    );
   }
   useEffect(() => {
     load();
@@ -261,25 +406,28 @@ function ResultsTab() {
   return (
     <div>
       <p className="muted">
-        Zadaj výsledok zápasu — body sa hráčom prepočítajú automaticky.
+        Zadaj výsledok zápasu — body sa hráčom prepočítajú automaticky. „Odomknúť" pri
+        zamknutom zápase umožní vybraným hráčom dotipovať ho (jeden tip, vyhodnotí sa
+        podľa zadaného výsledku).
       </p>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Výkop</th>
-            <th>Zápas</th>
-            <th>Výsledok</th>
-            <th>Tipovanie</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {matches.map((m) => (
-            <ResultRow key={m.id} match={m} onSaved={load} />
-          ))}
-        </tbody>
-      </table>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Výkop</th>
+              <th colSpan={5}>Zápas</th>
+              <th>Tipovanie</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {matches.map((m) => (
+              <ResultRow key={m.id} match={m} players={players} onSaved={load} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

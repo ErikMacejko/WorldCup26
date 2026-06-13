@@ -173,6 +173,7 @@ h2 { margin-top: 0; }
 .locked-score .my-tip { font-size: 1.2rem; font-weight: 700; }
 
 .match-footer { margin-top: 0.4rem; }
+.save-block { display: flex; flex-direction: column; gap: 0.4rem; }
 .save-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .locked-info { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem; }
 .locked-result { text-align: center; font-weight: 600; }
@@ -210,15 +211,18 @@ h2 { margin-top: 0; }
 .sched-match .sched-home { text-align: right; }
 .sched-match .sched-away { text-align: left; }
 .sched-match .flag { font-size: 1.2rem; }
-.sched-match .vs { color: var(--muted); font-weight: 600; min-width: 1.6rem; text-align: center; }
+.vs { color: var(--muted); font-weight: 600; min-width: 1.6rem; text-align: center; }
+.vs.result-edit { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--text); }
 @media (max-width: 640px) {
   .sched-row { grid-template-columns: 48px 1fr; }
   .sched-stage, .sched-venue { display: none; }
 }
 
 /* Tables */
-.table-wrap { overflow-x: auto; }
-.table-wrap .table { white-space: nowrap; }
+/* Let the table grow past 100% when its (nowrap) content needs more room —
+   e.g. a long team name — instead of squeezing other columns to fit. On
+   desktop this is shown in full; only below 645px does it scroll. */
+.table-wrap .table { width: auto; min-width: 100%; white-space: nowrap; }
 .table { width: 100%; border-collapse: collapse; }
 .table th, .table td { padding: 0.5rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); }
 .table th { color: var(--muted); font-weight: 600; font-size: 0.82rem; }
@@ -228,6 +232,15 @@ h2 { margin-top: 0; }
 .table tr.clickable:hover { background: var(--panel-2); }
 .table tr.finished { background: rgba(34,197,94,0.06); }
 .mini { width: 38px; text-align: center; padding: 0.25rem; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }
+
+/* Match columns split across real <td>s so long team names (e.g. "Bosnia
+   and Herzegovina") widen the table's shared column instead of throwing off
+   alignment in just one row. */
+.table .col-team { font-weight: 700; white-space: nowrap; }
+.table .col-home { text-align: right; }
+.table .col-away { text-align: left; }
+.table .col-flag { font-size: 1.2rem; text-align: center; }
+.table .col-vs { text-align: center; }
 
 /* Admin */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
@@ -245,3 +258,50 @@ h2 { margin-top: 0; }
 .tag.admin { background: #3b3f73; color: #c7caf5; }
 .tag.danger { background: var(--danger); color: #fff; }
 .tag.warn { background: var(--warn); color: #1b1b1b; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+.modal-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.1rem;
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.modal-head h3 { margin: 0; font-size: 1.05rem; }
+.modal-close {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 6px;
+}
+.modal-close:hover { color: var(--text); background: var(--panel-2); }
+
+/* Back-fill picker (modal) */
+.backfill-result { display: flex; align-items: center; gap: 0.35rem; }
+.backfill-search { width: 100%; }
+.backfill-all { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+.backfill-users { display: flex; flex-direction: column; gap: 0.1rem; overflow-y: auto; max-height: 240px; }
+.backfill-users label { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.4rem; border-radius: 6px; font-size: 0.9rem; cursor: pointer; }
+.backfill-users label:hover { background: var(--panel-2); }
+.backfill-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+@media (max-width: 645px) {
+  .modal-card { max-width: 100%; max-height: 92vh; padding: 0.9rem; }
+  .backfill-users { max-height: 45vh; }
+  .table-wrap { overflow-x: auto; }
+}
