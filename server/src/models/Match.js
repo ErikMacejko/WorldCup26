@@ -26,6 +26,9 @@ const matchSchema = new mongoose.Schema(
     result: {
       home: { type: Number, default: null },
       away: { type: Number, default: null },
+      // Who advanced on penalties, only set when home === away in a
+      // knockout-stage match.
+      penaltyWinner: { type: String, enum: ['home', 'away', null], default: null },
     },
     // Players an admin has granted a one-shot back-fill for this locked
     // match (see predictions.js). Each entry is consumed as soon as that
@@ -56,7 +59,11 @@ matchSchema.methods.toClient = function (now = new Date(), userId = null) {
     status: this.status,
     result:
       this.result && this.result.home != null && this.result.away != null
-        ? { home: this.result.home, away: this.result.away }
+        ? {
+            home: this.result.home,
+            away: this.result.away,
+            penaltyWinner: this.result.penaltyWinner || null,
+          }
         : null,
     locked: this.isLocked(now),
     canBackfill: userId ? this.backfillFor.some((id) => id.equals(userId)) : false,

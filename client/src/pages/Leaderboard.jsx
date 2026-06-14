@@ -48,7 +48,10 @@ export default function Leaderboard() {
           <tr>
             <th>#</th>
             <th>Hráč</th>
-            <th className="num">Body</th>
+            <th className="num">Zápasy</th>
+            <th className="num">Skupiny</th>
+            <th className="num">Playoff</th>
+            <th className="num">Celkom</th>
             <th className="num">Presné</th>
             <th className="num">Tipov</th>
           </tr>
@@ -61,6 +64,9 @@ export default function Leaderboard() {
             >
               <td>{r.rank}</td>
               <td>{r.nickname}</td>
+              <td className="num">{r.matchPoints}</td>
+              <td className="num">{r.groupPoints}</td>
+              <td className="num">{r.playoffPoints}</td>
               <td className="num strong">{r.totalPoints}</td>
               <td className="num">{r.exact}</td>
               <td className="num">{r.scored}</td>
@@ -68,7 +74,7 @@ export default function Leaderboard() {
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan="5" className="muted center">
+              <td colSpan="8" className="muted center">
                 Zatiaľ žiadne body.
               </td>
             </tr>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api.js';
 import { stageLabel, flag, teamCode, fmtDateTime } from '../lib/format.js';
+import GroupsAdminTab from './admin/GroupsAdminTab.jsx';
 
 // Only allow 0-99 (at most two digits) while typing a score.
 function handleScoreChange(setter) {
@@ -183,10 +184,13 @@ function UsersTab() {
 function BackfillPicker({ match, players, onClose, onSaved }) {
   const [home, setHome] = useState(match.result?.home ?? '');
   const [away, setAway] = useState(match.result?.away ?? '');
+  const [penaltyWinner, setPenaltyWinner] = useState(match.result?.penaltyWinner ?? '');
   const [selected, setSelected] = useState(() => new Set(match.backfillFor));
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const isDraw =
+    match.stage !== 'group' && home !== '' && away !== '' && Number(home) === Number(away);
   const allSelected = players.length > 0 && selected.size === players.length;
   const filtered = players.filter((p) =>
     (p.nickname || p.email || '').toLowerCase().includes(search.trim().toLowerCase())
@@ -208,7 +212,7 @@ function BackfillPicker({ match, players, onClose, onSaved }) {
     setBusy(true);
     try {
       await Promise.all([
-        api.admin.setResult(match.id, Number(home), Number(away)),
+        api.admin.setResult(match.id, Number(home), Number(away), isDraw ? penaltyWinner || null : null),
         api.admin.setBackfill(match.id, [...selected]),
       ]);
       await onSaved();
@@ -249,6 +253,17 @@ function BackfillPicker({ match, players, onClose, onSaved }) {
             value={away}
             onChange={handleScoreChange(setAway)}
           />
+          {isDraw && (
+            <select
+              className="mini-select"
+              value={penaltyWinner || ''}
+              onChange={(e) => setPenaltyWinner(e.target.value)}
+            >
+              <option value="">pen. ?</option>
+              <option value="home">pen. {teamCode(match.homeTeam)}</option>
+              <option value="away">pen. {teamCode(match.awayTeam)}</option>
+            </select>
+          )}
         </div>
 
         <input
@@ -292,26 +307,49 @@ function BackfillPicker({ match, players, onClose, onSaved }) {
   );
 }
 
-function ResultRow({ match, players, onSaved }) {
+function ResultRow({ match, players, allTeams, onSaved }) {
   const [home, setHome] = useState(match.result?.home ?? '');
   const [away, setAway] = useState(match.result?.away ?? '');
+  const [penaltyWinner, setPenaltyWinner] = useState(match.result?.penaltyWinner ?? '');
+  const [homeTeam, setHomeTeam] = useState(match.homeTeam);
+  const [awayTeam, setAwayTeam] = useState(match.awayTeam);
   const [busy, setBusy] = useState(false);
+  const [teamsBusy, setTeamsBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     setHome(match.result?.home ?? '');
     setAway(match.result?.away ?? '');
-  }, [match.result?.home, match.result?.away]);
+    setPenaltyWinner(match.result?.penaltyWinner ?? '');
+  }, [match.result?.home, match.result?.away, match.result?.penaltyWinner]);
+
+  useEffect(() => {
+    setHomeTeam(match.homeTeam);
+    setAwayTeam(match.awayTeam);
+  }, [match.homeTeam, match.awayTeam]);
 
   const finished = match.status === 'finished';
+  const isKnockout = match.stage !== 'group';
+  const isDraw = isKnockout && home !== '' && away !== '' && Number(home) === Number(away);
+  const teamsChanged = homeTeam !== match.homeTeam || awayTeam !== match.awayTeam;
 
   async function save() {
     setBusy(true);
     try {
-      await api.admin.setResult(match.id, Number(home), Number(away));
+      await api.admin.setResult(match.id, Number(home), Number(away), isDraw ? penaltyWinner || null : null);
       onSaved();
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveTeams() {
+    setTeamsBusy(true);
+    try {
+      await api.admin.setMatchTeams(match.id, homeTeam, awayTeam);
+      onSaved();
+    } finally {
+      setTeamsBusy(false);
     }
   }
 
@@ -321,10 +359,21 @@ function ResultRow({ match, players, onSaved }) {
         <td>{match.matchNumber}</td>
         <td className="muted small">{fmtDateTime(match.kickoff)}</td>
         <td className="col-team col-home">
-          <span className="cc-full">{match.homeTeam}</span>
-          <span className="cc-short">{teamCode(match.homeTeam)}</span>
+          {isKnockout ? (
+            <select className="team-select" value={homeTeam} onChange={(e) => setHomeTeam(e.target.value)}>
+              <option value="TBD">TBD</option>
+              {allTeams.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <span className="cc-full">{match.homeTeam}</span>
+              <span className="cc-short">{teamCode(match.homeTeam)}</span>
+            </>
+          )}
         </td>
-        <td className="col-flag">{flag(match.homeTeam)}</td>
+        <td className="col-flag">{flag(isKnockout ? homeTeam : match.homeTeam)}</td>
         <td className="col-vs">
           <span className="vs result-edit">
             <input
@@ -348,12 +397,34 @@ function ResultRow({ match, players, onSaved }) {
               disabled={finished}
               onChange={handleScoreChange(setAway)}
             />
+            {isDraw && !finished && (
+              <select
+                className="mini-select"
+                value={penaltyWinner || ''}
+                onChange={(e) => setPenaltyWinner(e.target.value)}
+              >
+                <option value="">pen. ?</option>
+                <option value="home">pen. {teamCode(homeTeam)}</option>
+                <option value="away">pen. {teamCode(awayTeam)}</option>
+              </select>
+            )}
           </span>
         </td>
-        <td className="col-flag">{flag(match.awayTeam)}</td>
+        <td className="col-flag">{flag(isKnockout ? awayTeam : match.awayTeam)}</td>
         <td className="col-team col-away">
-          <span className="cc-full">{match.awayTeam}</span>
-          <span className="cc-short">{teamCode(match.awayTeam)}</span>
+          {isKnockout ? (
+            <select className="team-select" value={awayTeam} onChange={(e) => setAwayTeam(e.target.value)}>
+              <option value="TBD">TBD</option>
+              {allTeams.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <span className="cc-full">{match.awayTeam}</span>
+              <span className="cc-short">{teamCode(match.awayTeam)}</span>
+            </>
+          )}
         </td>
         <td>
           {!finished ? (
@@ -365,15 +436,22 @@ function ResultRow({ match, players, onSaved }) {
           )}
         </td>
         <td>
-          {finished ? (
-            <button className="btn-sm" disabled={busy} onClick={() => setPickerOpen((v) => !v)}>
-              Odomknúť
-            </button>
-          ) : (
-            <button className="btn-sm" disabled={busy || home === '' || away === ''} onClick={save}>
-              Uložiť
-            </button>
-          )}
+          <div className="admin-actions">
+            {isKnockout && teamsChanged && (
+              <button className="btn-sm" disabled={teamsBusy} onClick={saveTeams}>
+                Uložiť tímy
+              </button>
+            )}
+            {finished ? (
+              <button className="btn-sm" disabled={busy} onClick={() => setPickerOpen((v) => !v)}>
+                Odomknúť
+              </button>
+            ) : (
+              <button className="btn-sm" disabled={busy || home === '' || away === ''} onClick={save}>
+                Uložiť
+              </button>
+            )}
+          </div>
         </td>
       </tr>
       {pickerOpen && (
@@ -391,6 +469,7 @@ function ResultRow({ match, players, onSaved }) {
 function ResultsTab() {
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
+  const [allTeams, setAllTeams] = useState([]);
 
   async function load() {
     const [ms, us] = await Promise.all([api.admin.matches(), api.admin.users()]);
@@ -401,6 +480,9 @@ function ResultsTab() {
   }
   useEffect(() => {
     load();
+    api.groups().then((groups) => {
+      setAllTeams(Object.values(groups).flat().sort());
+    });
   }, []);
 
   return (
@@ -423,7 +505,7 @@ function ResultsTab() {
           </thead>
           <tbody>
             {matches.map((m) => (
-              <ResultRow key={m.id} match={m} players={players} onSaved={load} />
+              <ResultRow key={m.id} match={m} players={players} allTeams={allTeams} onSaved={load} />
             ))}
           </tbody>
         </table>
@@ -444,8 +526,13 @@ export default function Admin() {
         <button className={tab === 'results' ? 'active' : ''} onClick={() => setTab('results')}>
           Výsledky
         </button>
+        <button className={tab === 'groups' ? 'active' : ''} onClick={() => setTab('groups')}>
+          Skupiny
+        </button>
       </div>
-      {tab === 'users' ? <UsersTab /> : <ResultsTab />}
+      {tab === 'users' && <UsersTab />}
+      {tab === 'results' && <ResultsTab />}
+      {tab === 'groups' && <GroupsAdminTab />}
     </div>
   );
 }

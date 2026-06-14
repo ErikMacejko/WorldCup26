@@ -21,7 +21,10 @@ function Nav() {
   if (!user) return null;
   return (
     <header className="nav">
-      <div className="nav-brand">⚽ MS 2026 Tipovačka</div>
+      <div className="nav-brand">
+        <span className="brand-mark">26</span>
+        <span className="brand-text">MS 2026 Tipovačka</span>
+      </div>
       <button
         className="nav-toggle"
         onClick={() => setMenuOpen((o) => !o)}

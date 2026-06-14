@@ -8,6 +8,8 @@ import { configurePassport } from './auth/passport.js';
 import authRoutes from './routes/auth.js';
 import matchRoutes from './routes/matches.js';
 import predictionRoutes from './routes/predictions.js';
+import groupsRoutes from './routes/groups.js';
+import playoffRoutes from './routes/playoff.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import adminRoutes from './routes/admin.js';
 
@@ -32,6 +34,8 @@ async function main() {
   app.use('/api/auth', authRoutes);
   app.use('/api/matches', matchRoutes);
   app.use('/api/predictions', predictionRoutes);
+  app.use('/api/groups', groupsRoutes);
+  app.use('/api/playoff', playoffRoutes);
   app.use('/api/leaderboard', leaderboardRoutes);
   app.use('/api/admin', adminRoutes);
 

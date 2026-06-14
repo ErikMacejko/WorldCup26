@@ -1,43 +1,56 @@
 import { Router } from 'express';
 import { Prediction } from '../models/Prediction.js';
+import { GroupPrediction } from '../models/GroupPrediction.js';
+import { PlayoffPrediction } from '../models/PlayoffPrediction.js';
 import { User } from '../models/User.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-// Aggregated leaderboard across all finished/scored matches.
-// Hidden (admin-hidden) users are excluded.
+// Aggregated leaderboard across all finished/scored matches plus Skupiny and
+// Playoff predictions. Hidden (admin-hidden) users are excluded.
 router.get('/', requireAuth, async (req, res) => {
   const visibleUsers = await User.find({
     hiddenFromLeaderboard: { $ne: true },
     nickname: { $type: 'string' },
   }).select('_id nickname');
 
-  const idToNick = new Map(visibleUsers.map((u) => [u._id.toString(), u.nickname]));
   const ids = visibleUsers.map((u) => u._id);
 
-  const agg = await Prediction.aggregate([
-    { $match: { user: { $in: ids }, points: { $ne: null } } },
-    {
-      $group: {
-        _id: '$user',
-        totalPoints: { $sum: '$points' },
-        scored: { $sum: 1 },
-        exact: { $sum: { $cond: [{ $eq: ['$points', 3] }, 1, 0] } },
+  const [matchAgg, groupPreds, playoffPreds] = await Promise.all([
+    Prediction.aggregate([
+      { $match: { user: { $in: ids }, points: { $ne: null } } },
+      {
+        $group: {
+          _id: '$user',
+          totalPoints: { $sum: '$points' },
+          scored: { $sum: 1 },
+          exact: { $sum: { $cond: [{ $eq: ['$points', 3] }, 1, 0] } },
+        },
       },
-    },
+    ]),
+    GroupPrediction.find({ user: { $in: ids } }).select('user points'),
+    PlayoffPrediction.find({ user: { $in: ids } }).select('user points'),
   ]);
 
-  const byUser = new Map(agg.map((a) => [a._id.toString(), a]));
+  const matchByUser = new Map(matchAgg.map((a) => [a._id.toString(), a]));
+  const groupByUser = new Map(groupPreds.map((p) => [p.user.toString(), p.points]));
+  const playoffByUser = new Map(playoffPreds.map((p) => [p.user.toString(), p.points]));
 
   const rows = visibleUsers
     .map((u) => {
-      const a = byUser.get(u._id.toString());
+      const m = matchByUser.get(u._id.toString());
+      const matchPoints = m?.totalPoints || 0;
+      const groupPoints = groupByUser.get(u._id.toString()) || 0;
+      const playoffPoints = playoffByUser.get(u._id.toString()) || 0;
       return {
         nickname: u.nickname,
-        totalPoints: a?.totalPoints || 0,
-        scored: a?.scored || 0,
-        exact: a?.exact || 0,
+        matchPoints,
+        groupPoints,
+        playoffPoints,
+        totalPoints: matchPoints + groupPoints + playoffPoints,
+        scored: m?.scored || 0,
+        exact: m?.exact || 0,
       };
     })
     .sort(
