@@ -9,6 +9,9 @@ const groupResultSchema = new mongoose.Schema(
     advancingThirds: { type: [String], default: [] },
     // Global toggle: when true, players can no longer edit Skupiny/Playoff predictions.
     predictionsLocked: { type: Boolean, default: false },
+    // Set by lib/sync.js after each auto-sync run against football-data.org.
+    lastSyncAt: { type: Date, default: null },
+    lastSyncError: { type: String, default: null },
   },
   { timestamps: true }
 );

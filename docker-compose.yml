@@ -24,6 +24,7 @@ services:
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:8080/api/auth/google/callback}
       ADMIN_EMAILS: ${ADMIN_EMAILS}
       LOCK_MINUTES: ${LOCK_MINUTES:-30}
+      FOOTBALL_DATA_TOKEN: ${FOOTBALL_DATA_TOKEN}
       NODE_ENV: production
     # No public port — the frontend's nginx proxies /api to it.
     expose:

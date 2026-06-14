@@ -1,10 +1,10 @@
 // Scoring for the Playoff (knockout bracket) predictions.
 //
-// The "reference" bracket is built from the admin-entered GroupResult via
-// buildBracket32 (our own convention, see lib/bracket.js), then each
-// reference pairing's winner is whichever of its two teams went furthest in
-// the real tournament ("depth"). Depths are derived from finished knockout
-// Match docs, so reference winners refine progressively as results come in.
+// For each round, a player's predicted entrants (the previous round's
+// winners) are compared against the teams that *really* reached that round
+// in the actual tournament — by set membership, independent of bracket
+// position — plus a bonus for each predicted pairing that also occurs as a
+// real matchup in that round. The champion pick is a flat bonus.
 
 import { GROUPS } from '../seed/matchData.js';
 
@@ -65,94 +65,76 @@ export function computeRealDepths(groupResult, knockoutMatches) {
   return depths;
 }
 
-function depthOf(depths, team) {
-  return depths.get(team) ?? 0;
-}
-
-// Winner of a fictional pairing = team with the higher real depth.
-// Equal depths -> no scoreable winner (null).
-function depthWinner(depths, a, b) {
-  const da = depthOf(depths, a);
-  const db = depthOf(depths, b);
-  if (da === db) return null;
-  return da > db ? a : b;
-}
-
-// referenceBracket: 16 [teamA, teamB] R32 pairs (from buildBracket32 on GroupResult).
-// Returns 5 rounds: [R32 (16), R16 (8), QF (4), SF (2), Final (1)], each an
-// array of { pair: [a,b], winner: team|null }.
-export function buildReferenceRounds(referenceBracket, depths) {
-  const rounds = [];
-  let pairs = referenceBracket;
-  for (let round = 0; round < 4; round++) {
-    rounds.push(pairs.map(([a, b]) => ({ pair: [a, b], winner: depthWinner(depths, a, b) })));
-    const advancing = pairs.map(([a, b]) => {
-      const w = depthWinner(depths, a, b);
-      if (w) return w;
-      return [a, b].sort()[0]; // deterministic tiebreak so the bracket stays complete
-    });
-    const next = [];
-    for (let i = 0; i < advancing.length; i += 2) next.push([advancing[i], advancing[i + 1]]);
-    pairs = next;
+// Teams whose real depth is >= threshold, i.e. teams that *won* their match
+// in the previous round and so really reached this round.
+function realAdvancers(depths, threshold) {
+  const out = [];
+  for (const [team, depth] of depths) {
+    if (depth >= threshold) out.push(team);
   }
-  const finalPair = pairs[0] || [null, null];
-  rounds.push([{ pair: finalPair, winner: depthWinner(depths, finalPair[0], finalPair[1]) }]);
-  return rounds;
+  return out;
 }
 
-const ROUND_KEYS = ['r32Winners', 'r16Winners', 'qfWinners', 'sfWinners'];
-const ROUND_NAMES = ['r32', 'r16', 'qf', 'sf'];
-
-function buildPredictedRounds(predictedBracket, predictedWinners) {
-  const rounds = [];
-  let pairs = predictedBracket;
-  for (const key of ROUND_KEYS) {
-    const winners = predictedWinners?.[key] || [];
-    rounds.push(pairs.map((pair, j) => ({ pair, winner: winners[j] ?? null })));
-    const next = [];
-    for (let j = 0; j < winners.length; j += 2) next.push([winners[j], winners[j + 1]]);
-    pairs = next;
-  }
-  rounds.push([{ pair: pairs[0] || [null, null], winner: predictedWinners?.champion || null }]);
-  return rounds;
+// [a, b, c, d] -> [[a, b], [c, d]] (consecutive bracket pairs).
+function chunkPairs(arr) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += 2) out.push([arr[i], arr[i + 1]]);
+  return out;
 }
 
-function pairMatches(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== 2 || b.length !== 2) return false;
-  if (a[0] == null || a[1] == null || b[0] == null || b[1] == null) return false;
-  const sa = [...a].sort();
-  const sb = [...b].sort();
-  return sa[0] === sb[0] && sa[1] === sb[1];
+function pairKey(a, b) {
+  return [a, b].sort().join('|');
 }
 
-// predictedBracket: 16 [a,b] R32 pairs derived from the user's GroupPrediction.
+// Real matchups for a knockout stage, as team pairs (only matches whose two
+// teams are already assigned).
+function realPairings(knockoutMatches, stage) {
+  return (knockoutMatches || [])
+    .filter((m) => m.stage === stage && m.homeTeam !== 'TBD' && m.awayTeam !== 'TBD')
+    .map((m) => [m.homeTeam, m.awayTeam]);
+}
+
+// +1 per predicted team that's also in the real set for that round.
+function countTeamHits(predicted, realSet) {
+  return (predicted || []).filter((team) => team && realSet.has(team)).length;
+}
+
+// +1 per predicted pairing that's also a real pairing for that round.
+function countPairingHits(predictedPairs, realPairs) {
+  const realKeys = new Set(realPairs.map(([a, b]) => pairKey(a, b)));
+  return predictedPairs.filter(([a, b]) => a && b && realKeys.has(pairKey(a, b))).length;
+}
+
+// Depth a team needs to have *really reached* (won its previous-round match
+// and advanced into) each round.
+const ADVANCE_DEPTH = { r16: 2, qf: 3, sf: 4, final: 5 };
+
 // predictedWinners: { r32Winners[16], r16Winners[8], qfWinners[4], sfWinners[2], champion }
-// reference: result of buildReferenceRounds(...)
-// Returns { total, breakdown }, total max 71.
-export function computePlayoffPoints(predictedBracket, predictedWinners, reference) {
-  const predicted = buildPredictedRounds(predictedBracket, predictedWinners);
+// depths: result of computeRealDepths(...)
+// knockoutMatches: Match docs for matchNumber 73-104
+// Returns { total, breakdown }, max 54.
+export function computePlayoffPoints(predictedWinners, depths, knockoutMatches) {
   const breakdown = {};
   let total = 0;
 
-  for (let r = 0; r < 4; r++) {
-    let pairingPts = 0;
-    let winnerPts = 0;
-    for (let j = 0; j < reference[r].length; j++) {
-      const refEntry = reference[r][j];
-      const predEntry = predicted[r][j];
-      if (predEntry && pairMatches(predEntry.pair, refEntry.pair)) pairingPts += 1;
-      if (refEntry.winner && predEntry && predEntry.winner === refEntry.winner) winnerPts += 1;
-    }
-    breakdown[ROUND_NAMES[r]] = { pairing: pairingPts, winner: winnerPts };
-    total += pairingPts + winnerPts;
+  function scoreRound(key, predictedTeams, advanceDepth, stage) {
+    const realTeams = new Set(realAdvancers(depths, advanceDepth));
+    const team = countTeamHits(predictedTeams, realTeams);
+    const pairing = countPairingHits(chunkPairs(predictedTeams), realPairings(knockoutMatches, stage));
+    breakdown[key] = { team, pairing };
+    total += team + pairing;
   }
 
-  const refFinal = reference[4][0];
-  const predFinal = predicted[4][0];
-  const finalPairing = predFinal && pairMatches(predFinal.pair, refFinal.pair) ? 1 : 0;
-  const championPts = refFinal.winner && predFinal?.winner === refFinal.winner ? 10 : 0;
-  breakdown.final = { pairing: finalPairing, champion: championPts };
-  total += finalPairing + championPts;
+  scoreRound('r16', predictedWinners.r32Winners, ADVANCE_DEPTH.r16, 'round16');
+  scoreRound('qf', predictedWinners.r16Winners, ADVANCE_DEPTH.qf, 'quarter');
+  scoreRound('sf', predictedWinners.qfWinners, ADVANCE_DEPTH.sf, 'semi');
+
+  const realFinalists = new Set(realAdvancers(depths, ADVANCE_DEPTH.final));
+  const finalTeam = countTeamHits(predictedWinners.sfWinners, realFinalists);
+  const realChampion = realAdvancers(depths, 6)[0] || null;
+  const championPts = realChampion && predictedWinners.champion === realChampion ? 10 : 0;
+  breakdown.final = { team: finalTeam, champion: championPts };
+  total += finalTeam + championPts;
 
   return { total, breakdown };
 }

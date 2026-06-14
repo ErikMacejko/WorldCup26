@@ -4,14 +4,6 @@ import { api } from '../api.js';
 import { stageLabel, flag, teamCode, fmtDateTime } from '../lib/format.js';
 import GroupsAdminTab from './admin/GroupsAdminTab.jsx';
 
-// Only allow 0-99 (at most two digits) while typing a score.
-function handleScoreChange(setter) {
-  return (e) => {
-    const v = e.target.value;
-    if (/^[0-9]{0,2}$/.test(v)) setter(v);
-  };
-}
-
 function UserDetail({ id, onChanged }) {
   const [data, setData] = useState(null);
 
@@ -178,19 +170,14 @@ function UsersTab() {
   );
 }
 
-// Opened via "Odomknúť" on a finished match: lets the admin correct the
-// result and/or pick which players get a one-shot back-fill for this locked
-// match. The single "Uložiť" here saves both (and replaces match.backfillFor).
+// Opened via "Odomknúť" on a finished match: lets the admin pick which
+// players get a one-shot back-fill for this locked match (the result itself
+// is auto-synced and shown read-only here).
 function BackfillPicker({ match, players, onClose, onSaved }) {
-  const [home, setHome] = useState(match.result?.home ?? '');
-  const [away, setAway] = useState(match.result?.away ?? '');
-  const [penaltyWinner, setPenaltyWinner] = useState(match.result?.penaltyWinner ?? '');
   const [selected, setSelected] = useState(() => new Set(match.backfillFor));
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const isDraw =
-    match.stage !== 'group' && home !== '' && away !== '' && Number(home) === Number(away);
   const allSelected = players.length > 0 && selected.size === players.length;
   const filtered = players.filter((p) =>
     (p.nickname || p.email || '').toLowerCase().includes(search.trim().toLowerCase())
@@ -211,10 +198,7 @@ function BackfillPicker({ match, players, onClose, onSaved }) {
   async function save() {
     setBusy(true);
     try {
-      await Promise.all([
-        api.admin.setResult(match.id, Number(home), Number(away), isDraw ? penaltyWinner || null : null),
-        api.admin.setBackfill(match.id, [...selected]),
-      ]);
+      await api.admin.setBackfill(match.id, [...selected]);
       await onSaved();
       onClose();
     } finally {
@@ -232,38 +216,10 @@ function BackfillPicker({ match, players, onClose, onSaved }) {
           </button>
         </div>
 
-        <div className="backfill-result">
-          <span className="muted small">Výsledok:</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]{1,2}"
-            maxLength={2}
-            className="mini"
-            value={home}
-            onChange={handleScoreChange(setHome)}
-          />
-          :
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]{1,2}"
-            maxLength={2}
-            className="mini"
-            value={away}
-            onChange={handleScoreChange(setAway)}
-          />
-          {isDraw && (
-            <select
-              className="mini-select"
-              value={penaltyWinner || ''}
-              onChange={(e) => setPenaltyWinner(e.target.value)}
-            >
-              <option value="">pen. ?</option>
-              <option value="home">pen. {teamCode(match.homeTeam)}</option>
-              <option value="away">pen. {teamCode(match.awayTeam)}</option>
-            </select>
-          )}
+        <div className="backfill-result muted small">
+          Výsledok: {match.result?.home != null && match.result?.away != null
+            ? `${match.result.home}:${match.result.away}`
+            : '–:–'}
         </div>
 
         <input
@@ -294,7 +250,7 @@ function BackfillPicker({ match, players, onClose, onSaved }) {
         </div>
 
         <div className="backfill-actions">
-          <button className="btn-sm" disabled={busy || home === '' || away === ''} onClick={save}>
+          <button className="btn-sm" disabled={busy} onClick={save}>
             Uložiť
           </button>
           <button className="btn-ghost" disabled={busy} onClick={onClose}>
@@ -307,51 +263,17 @@ function BackfillPicker({ match, players, onClose, onSaved }) {
   );
 }
 
-function ResultRow({ match, players, allTeams, onSaved }) {
-  const [home, setHome] = useState(match.result?.home ?? '');
-  const [away, setAway] = useState(match.result?.away ?? '');
-  const [penaltyWinner, setPenaltyWinner] = useState(match.result?.penaltyWinner ?? '');
-  const [homeTeam, setHomeTeam] = useState(match.homeTeam);
-  const [awayTeam, setAwayTeam] = useState(match.awayTeam);
-  const [busy, setBusy] = useState(false);
-  const [teamsBusy, setTeamsBusy] = useState(false);
+function ResultRow({ match, players, onSaved }) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  useEffect(() => {
-    setHome(match.result?.home ?? '');
-    setAway(match.result?.away ?? '');
-    setPenaltyWinner(match.result?.penaltyWinner ?? '');
-  }, [match.result?.home, match.result?.away, match.result?.penaltyWinner]);
-
-  useEffect(() => {
-    setHomeTeam(match.homeTeam);
-    setAwayTeam(match.awayTeam);
-  }, [match.homeTeam, match.awayTeam]);
-
   const finished = match.status === 'finished';
-  const isKnockout = match.stage !== 'group';
-  const isDraw = isKnockout && home !== '' && away !== '' && Number(home) === Number(away);
-  const teamsChanged = homeTeam !== match.homeTeam || awayTeam !== match.awayTeam;
-
-  async function save() {
-    setBusy(true);
-    try {
-      await api.admin.setResult(match.id, Number(home), Number(away), isDraw ? penaltyWinner || null : null);
-      onSaved();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function saveTeams() {
-    setTeamsBusy(true);
-    try {
-      await api.admin.setMatchTeams(match.id, homeTeam, awayTeam);
-      onSaved();
-    } finally {
-      setTeamsBusy(false);
-    }
-  }
+  const result =
+    match.result?.home != null && match.result?.away != null
+      ? `${match.result.home}:${match.result.away}`
+      : '–:–';
+  const penalty = match.result?.penaltyWinner
+    ? ` (pen. ${teamCode(match.result.penaltyWinner === 'home' ? match.homeTeam : match.awayTeam)})`
+    : '';
 
   return (
     <>
@@ -359,72 +281,20 @@ function ResultRow({ match, players, allTeams, onSaved }) {
         <td>{match.matchNumber}</td>
         <td className="muted small">{fmtDateTime(match.kickoff)}</td>
         <td className="col-team col-home">
-          {isKnockout ? (
-            <select className="team-select" value={homeTeam} onChange={(e) => setHomeTeam(e.target.value)}>
-              <option value="TBD">TBD</option>
-              {allTeams.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          ) : (
-            <>
-              <span className="cc-full">{match.homeTeam}</span>
-              <span className="cc-short">{teamCode(match.homeTeam)}</span>
-            </>
-          )}
+          <span className="cc-full">{match.homeTeam}</span>
+          <span className="cc-short">{teamCode(match.homeTeam)}</span>
         </td>
-        <td className="col-flag">{flag(isKnockout ? homeTeam : match.homeTeam)}</td>
+        <td className="col-flag">{flag(match.homeTeam)}</td>
         <td className="col-vs">
-          <span className="vs result-edit">
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]{1,2}"
-              maxLength={2}
-              className="mini"
-              value={home}
-              disabled={finished}
-              onChange={handleScoreChange(setHome)}
-            />
-            :
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]{1,2}"
-              maxLength={2}
-              className="mini"
-              value={away}
-              disabled={finished}
-              onChange={handleScoreChange(setAway)}
-            />
-            {isDraw && !finished && (
-              <select
-                className="mini-select"
-                value={penaltyWinner || ''}
-                onChange={(e) => setPenaltyWinner(e.target.value)}
-              >
-                <option value="">pen. ?</option>
-                <option value="home">pen. {teamCode(homeTeam)}</option>
-                <option value="away">pen. {teamCode(awayTeam)}</option>
-              </select>
-            )}
+          <span className="vs">
+            {result}
+            {penalty && <span className="muted small">{penalty}</span>}
           </span>
         </td>
-        <td className="col-flag">{flag(isKnockout ? awayTeam : match.awayTeam)}</td>
+        <td className="col-flag">{flag(match.awayTeam)}</td>
         <td className="col-team col-away">
-          {isKnockout ? (
-            <select className="team-select" value={awayTeam} onChange={(e) => setAwayTeam(e.target.value)}>
-              <option value="TBD">TBD</option>
-              {allTeams.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          ) : (
-            <>
-              <span className="cc-full">{match.awayTeam}</span>
-              <span className="cc-short">{teamCode(match.awayTeam)}</span>
-            </>
-          )}
+          <span className="cc-full">{match.awayTeam}</span>
+          <span className="cc-short">{teamCode(match.awayTeam)}</span>
         </td>
         <td>
           {!finished ? (
@@ -436,22 +306,11 @@ function ResultRow({ match, players, allTeams, onSaved }) {
           )}
         </td>
         <td>
-          <div className="admin-actions">
-            {isKnockout && teamsChanged && (
-              <button className="btn-sm" disabled={teamsBusy} onClick={saveTeams}>
-                Uložiť tímy
-              </button>
-            )}
-            {finished ? (
-              <button className="btn-sm" disabled={busy} onClick={() => setPickerOpen((v) => !v)}>
-                Odomknúť
-              </button>
-            ) : (
-              <button className="btn-sm" disabled={busy || home === '' || away === ''} onClick={save}>
-                Uložiť
-              </button>
-            )}
-          </div>
+          {finished && (
+            <button className="btn-sm" onClick={() => setPickerOpen((v) => !v)}>
+              Odomknúť
+            </button>
+          )}
         </td>
       </tr>
       {pickerOpen && (
@@ -469,29 +328,59 @@ function ResultRow({ match, players, allTeams, onSaved }) {
 function ResultsTab() {
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
-  const [allTeams, setAllTeams] = useState([]);
+  const [groupResult, setGroupResult] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   async function load() {
-    const [ms, us] = await Promise.all([api.admin.matches(), api.admin.users()]);
+    const [ms, us, gr] = await Promise.all([
+      api.admin.matches(),
+      api.admin.users(),
+      api.admin.groupResult(),
+    ]);
     setMatches(ms);
     setPlayers(
       us.filter((u) => u.nickname).sort((a, b) => a.nickname.localeCompare(b.nickname))
     );
+    setGroupResult(gr);
   }
   useEffect(() => {
     load();
-    api.groups().then((groups) => {
-      setAllTeams(Object.values(groups).flat().sort());
-    });
   }, []);
+
+  async function syncNow() {
+    setSyncing(true);
+    try {
+      await api.admin.syncNow();
+      await load();
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   return (
     <div>
       <p className="muted">
-        Zadaj výsledok zápasu — body sa hráčom prepočítajú automaticky. „Odomknúť" pri
-        zamknutom zápase umožní vybraným hráčom dotipovať ho (jeden tip, vyhodnotí sa
-        podľa zadaného výsledku).
+        Výsledky zápasov sa automaticky synchronizujú z reálneho turnaja (football-data.org)
+        každých 10 minút. „Odomknúť" pri zamknutom zápase umožní vybraným hráčom dotipovať ho po
+        termíne (jeden tip, vyhodnotí sa podľa synchronizovaného výsledku).
       </p>
+
+      {groupResult && (
+        <div className="card sync-status">
+          <span>
+            {groupResult.lastSyncAt
+              ? `Posledná synchronizácia: ${fmtDateTime(groupResult.lastSyncAt)}`
+              : 'Ešte nebola vykonaná žiadna synchronizácia.'}
+          </span>
+          {groupResult.lastSyncError && (
+            <span className="error small">Chyba: {groupResult.lastSyncError}</span>
+          )}
+          <button className="btn-sm" onClick={syncNow} disabled={syncing}>
+            {syncing ? 'Synchronizujem…' : 'Synchronizovať teraz'}
+          </button>
+        </div>
+      )}
+
       <div className="table-wrap">
         <table className="table">
           <thead>
@@ -505,7 +394,7 @@ function ResultsTab() {
           </thead>
           <tbody>
             {matches.map((m) => (
-              <ResultRow key={m.id} match={m} players={players} allTeams={allTeams} onSaved={load} />
+              <ResultRow key={m.id} match={m} players={players} onSaved={load} />
             ))}
           </tbody>
         </table>

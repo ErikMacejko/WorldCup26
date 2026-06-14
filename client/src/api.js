@@ -62,22 +62,17 @@ export const api = {
   savePlayoffPrediction: (picks) =>
     req('/playoff/mine', { method: 'PUT', body: JSON.stringify(picks) }),
 
+  results: {
+    tables: () => req('/results/tables'),
+    playoff: () => req('/results/playoff'),
+  },
+
   admin: {
     users: () => req('/admin/users'),
     user: (id) => req(`/admin/users/${id}`),
     toggleHide: (id) => req(`/admin/users/${id}/toggle-hide`, { method: 'POST' }),
     toggleBlock: (id) => req(`/admin/users/${id}/toggle-block`, { method: 'POST' }),
     matches: () => req('/admin/matches'),
-    setResult: (id, home, away, penaltyWinner = null) =>
-      req(`/admin/matches/${id}/result`, {
-        method: 'PUT',
-        body: JSON.stringify({ home, away, penaltyWinner }),
-      }),
-    setMatchTeams: (id, homeTeam, awayTeam) =>
-      req(`/admin/matches/${id}/teams`, {
-        method: 'PUT',
-        body: JSON.stringify({ homeTeam, awayTeam }),
-      }),
     setBackfill: (id, userIds) =>
       req(`/admin/matches/${id}/backfill`, {
         method: 'POST',
@@ -87,18 +82,7 @@ export const api = {
       req(`/admin/users/${userId}/predictions/${matchId}`, { method: 'DELETE' }),
 
     groupResult: () => req('/admin/group-result'),
-    setGroupResultOrder: (letter, order) =>
-      req(`/admin/group-result/${letter}`, {
-        method: 'PUT',
-        body: JSON.stringify({ order }),
-      }),
-    clearGroupResultOrder: (letter) =>
-      req(`/admin/group-result/${letter}`, { method: 'DELETE' }),
-    setAdvancingThirds: (letters) =>
-      req('/admin/group-result/advancing-thirds', {
-        method: 'PUT',
-        body: JSON.stringify({ letters }),
-      }),
     toggleGroupLock: () => req('/admin/group-result/toggle-lock', { method: 'POST' }),
+    syncNow: () => req('/admin/sync-results', { method: 'POST' }),
   },
 };

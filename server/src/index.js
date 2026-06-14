@@ -11,7 +11,11 @@ import predictionRoutes from './routes/predictions.js';
 import groupsRoutes from './routes/groups.js';
 import playoffRoutes from './routes/playoff.js';
 import leaderboardRoutes from './routes/leaderboard.js';
+import resultsRoutes from './routes/results.js';
 import adminRoutes from './routes/admin.js';
+import { syncResults } from './lib/sync.js';
+
+const SYNC_INTERVAL_MS = 10 * 60 * 1000;
 
 async function main() {
   await connectDb();
@@ -37,6 +41,7 @@ async function main() {
   app.use('/api/groups', groupsRoutes);
   app.use('/api/playoff', playoffRoutes);
   app.use('/api/leaderboard', leaderboardRoutes);
+  app.use('/api/results', resultsRoutes);
   app.use('/api/admin', adminRoutes);
 
   // Centralised error handler.
@@ -48,6 +53,15 @@ async function main() {
   app.listen(config.port, () => {
     console.log(`[server] listening on http://localhost:${config.port}`);
   });
+
+  // Auto-sync real World Cup results from football-data.org on startup and
+  // periodically (well within the free tier's 10 req/min limit).
+  syncResults()
+    .then((status) => console.log('[sync] startup sync done:', status))
+    .catch((err) => console.error('[sync] startup sync failed:', err));
+  setInterval(() => {
+    syncResults().catch((err) => console.error('[sync] periodic sync failed:', err));
+  }, SYNC_INTERVAL_MS);
 }
 
 main().catch((err) => {

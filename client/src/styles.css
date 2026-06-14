@@ -100,6 +100,7 @@ body {
 }
 
 .content { flex: 1; width: 100%; max-width: 880px; margin: 0 auto; padding: 1.25rem; }
+.content:has(.page-wide) { max-width: 1320px; }
 .footer { text-align: center; padding: 1rem; font-size: 0.8rem; border-top: 1px solid var(--border); }
 
 .page { animation: fade 0.2s ease; }
@@ -230,7 +231,6 @@ h2 { margin-top: 0; }
 .sched-match .sched-away { text-align: left; }
 .sched-match .flag { font-size: 1.2rem; }
 .vs { color: var(--muted); font-weight: 600; min-width: 1.6rem; text-align: center; }
-.vs.result-edit { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--text); }
 @media (max-width: 640px) {
   .sched-row { grid-template-columns: 48px 1fr; }
   .sched-stage, .sched-venue { display: none; }
@@ -249,7 +249,6 @@ h2 { margin-top: 0; }
 .table tr.clickable { cursor: pointer; }
 .table tr.clickable:hover { background: var(--panel-2); }
 .table tr.finished { background: rgba(59,130,246,0.06); }
-.mini { width: 38px; text-align: center; padding: 0.25rem; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }
 
 /* Match columns split across real <td>s so long team names (e.g. "Bosnia
    and Herzegovina") widen the table's shared column instead of throwing off
@@ -356,6 +355,18 @@ h2 { margin-top: 0; }
 .pts-tag.pts-good { background: #2f6b3f; color: #fff; }
 .pts-tag.pts-zero { background: #3a2030; color: #f3aebd; }
 
+/* Výsledky MS: Tabuľky tab */
+.results-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin: 0.75rem 0; }
+@media (max-width: 900px) { .results-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .results-grid { grid-template-columns: 1fr; } }
+.results-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.results-table th { color: var(--muted); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; padding: 0.2rem 0.3rem; text-align: right; }
+.results-table th:nth-child(2) { text-align: left; }
+.results-row td { padding: 0.3rem; border-bottom: 1px solid var(--border); }
+.results-row:last-child td { border-bottom: none; }
+.results-table .col-team { display: flex; align-items: center; gap: 0.4rem; }
+.results-table .col-team .team-name { font-size: 0.9rem; }
+
 /* Playoff bracket */
 .bracket { display: flex; flex-direction: column; gap: 1rem; margin: 0.75rem 0; }
 .bracket-round h3 { margin: 0 0 0.5rem; font-size: 1rem; color: var(--accent-2); }
@@ -381,6 +392,7 @@ h2 { margin-top: 0; }
   background: #0b1220; color: #fff; font-size: 0.7rem; font-weight: 900;
 }
 .bracket-team.selected:disabled { opacity: 1; }
+.bt-score { font-weight: 800; margin-left: 0.4rem; }
 .playoff-points-summary { margin: 0.75rem 0; }
 .playoff-breakdown { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.4rem; font-size: 0.85rem; }
 
@@ -483,12 +495,5 @@ h2 { margin-top: 0; }
 /* Thirds-selection modal (Skupiny tabs, player + admin) */
 .thirds-modal-list { display: flex; flex-direction: column; gap: 0.1rem; overflow-y: auto; max-height: 50vh; }
 
-/* Admin: Results tab team/penalty selectors */
-.team-select, .mini-select {
-  font: inherit; border-radius: 6px; border: 1px solid var(--border);
-  background: var(--panel-2); color: var(--text);
-}
-.team-select { font-size: 0.82rem; padding: 0.25rem 0.4rem; }
-.mini-select { font-size: 0.78rem; padding: 0.2rem 0.3rem; }
-.admin-actions { display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-start; }
-.admin-actions .btn-sm { margin-right: 0; }
+/* Sync status bar (Admin: Výsledky / Skupiny tabs) */
+.sync-status { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }

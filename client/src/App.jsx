@@ -4,6 +4,7 @@ import { useAuth } from './auth.jsx';
 import Login from './pages/Login.jsx';
 import Nickname from './pages/Nickname.jsx';
 import Tipovacka from './pages/Tipovacka.jsx';
+import Vysledky from './pages/Vysledky.jsx';
 import MyTips from './pages/MyTips.jsx';
 import Schedule from './pages/Schedule.jsx';
 import Leaderboard from './pages/Leaderboard.jsx';
@@ -35,6 +36,7 @@ function Nav() {
       </button>
       <nav className={`nav-links ${menuOpen ? 'open' : ''}`}>
         <NavLink to="/" end>Tipovačka</NavLink>
+        <NavLink to="/vysledky">Výsledky MS</NavLink>
         <NavLink to="/moje-tipy">Moje tipy</NavLink>
         <NavLink to="/schedule">Rozpis</NavLink>
         <NavLink to="/leaderboard">Poradie</NavLink>
@@ -84,6 +86,14 @@ export default function App() {
             element={
               <Protected>
                 <Tipovacka />
+              </Protected>
+            }
+          />
+          <Route
+            path="/vysledky"
+            element={
+              <Protected>
+                <Vysledky />
               </Protected>
             }
           />

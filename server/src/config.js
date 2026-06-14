@@ -21,6 +21,8 @@ export const config = {
     .filter(Boolean),
   // Minutes before kickoff when betting locks and others' tips become visible.
   lockMinutes: parseInt(process.env.LOCK_MINUTES || '30', 10),
+  // football-data.org API token used to auto-sync real World Cup results.
+  footballDataToken: process.env.FOOTBALL_DATA_TOKEN || '',
 };
 
 export const LOCK_MS = config.lockMinutes * 60 * 1000;
