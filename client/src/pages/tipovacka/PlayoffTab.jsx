@@ -38,6 +38,8 @@ function deriveBracketState(bracket, raw) {
 export default function PlayoffTab({ onGoToGroups }) {
   const [loading, setLoading] = useState(true);
   const [bracket, setBracket] = useState(null);
+  const [thirdPicks, setThirdPicks] = useState(Array(16).fill(null));
+  const [thirdOptions, setThirdOptions] = useState({});
   const [r32Winners, setR32Winners] = useState(Array(16).fill(null));
   const [r16Winners, setR16Winners] = useState(Array(8).fill(null));
   const [qfWinners, setQfWinners] = useState(Array(4).fill(null));
@@ -54,6 +56,8 @@ export default function PlayoffTab({ onGoToGroups }) {
   useEffect(() => {
     api.myPlayoffPrediction().then((mine) => {
       setBracket(mine.bracket);
+      setThirdPicks(normalize(mine.thirdPicks, 16));
+      setThirdOptions(mine.thirdOptions || {});
       setR32Winners(normalize(mine.r32Winners, 16));
       setR16Winners(normalize(mine.r16Winners, 8));
       setQfWinners(normalize(mine.qfWinners, 4));
@@ -80,9 +84,43 @@ export default function PlayoffTab({ onGoToGroups }) {
     );
   }
 
-  const derived = deriveBracketState(bracket, { r32Winners, r16Winners, qfWinners, sfWinners, champion });
+  // Map each predicted "best 3rd place" letter to its team name, and resolve
+  // the R32 wildcard slots using the player's current thirdPicks.
+  const letterToTeam = {};
+  for (const opts of Object.values(thirdOptions)) {
+    for (const { letter, team } of opts) letterToTeam[letter] = team;
+  }
+  const usedLetters = new Set(thirdPicks.filter(Boolean));
+  const resolvedBracket = bracket.map((pair, i) => {
+    if (!thirdOptions[i]) return pair;
+    const letter = thirdPicks[i];
+    return [pair[0], letter ? letterToTeam[letter] ?? null : null];
+  });
+
+  const thirdPickers = {};
+  for (const key of Object.keys(thirdOptions)) {
+    const i = Number(key);
+    const current = thirdPicks[i];
+    thirdPickers[i] = {
+      value: current || '',
+      options: thirdOptions[i].filter((o) => o.letter === current || !usedLetters.has(o.letter)),
+      onChange: (letter) => pickThird(i, letter),
+    };
+  }
+
+  const derived = deriveBracketState(resolvedBracket, { r32Winners, r16Winners, qfWinners, sfWinners, champion });
+  derived.r32.thirdPickers = thirdPickers;
   const setters = { r32: setR32Winners, r16: setR16Winners, qf: setQfWinners, sf: setSfWinners };
   const ready = derived.final.winner != null;
+
+  function pickThird(idx, letter) {
+    if (locked) return;
+    setThirdPicks((prev) => {
+      const next = [...prev];
+      next[idx] = letter || null;
+      return next;
+    });
+  }
 
   function pick(roundKey, idx, team) {
     if (locked) return;
@@ -103,6 +141,7 @@ export default function PlayoffTab({ onGoToGroups }) {
     setSaving(true);
     try {
       const res = await api.savePlayoffPrediction({
+        thirdPicks,
         r32Winners: derived.r32.winners,
         r16Winners: derived.r16.winners,
         qfWinners: derived.qf.winners,
@@ -110,6 +149,8 @@ export default function PlayoffTab({ onGoToGroups }) {
         champion: derived.final.winner,
       });
       setBracket(res.bracket);
+      setThirdPicks(normalize(res.thirdPicks, 16));
+      setThirdOptions(res.thirdOptions || {});
       setR32Winners(normalize(res.r32Winners, 16));
       setR16Winners(normalize(res.r16Winners, 8));
       setQfWinners(normalize(res.qfWinners, 4));
@@ -123,6 +164,7 @@ export default function PlayoffTab({ onGoToGroups }) {
     } catch (err) {
       if (err.code === 'locked') setError('Tipovanie playoff je uzamknuté.');
       else if (err.code === 'groups_incomplete') setError('Najprv dokonči tipovanie skupín.');
+      else if (err.code === 'invalid_third_picks') setError('Priraď všetkých 8 tretích miest na voľné sloty v R32.');
       else setError('Uloženie zlyhalo.');
     } finally {
       setSaving(false);
@@ -132,11 +174,13 @@ export default function PlayoffTab({ onGoToGroups }) {
   return (
     <div>
       <p className="muted">
-        Tvoj pavúk je odvodený z tipov v sekcii Skupiny (12 víťazov skupín, 12 druhých a 8 vybraných
-        tretích miest). Postupne vyber víťaza každého súboja. Body: v R16/štvrťfinále/semifinále
-        získaš +1 b za každý tím, ktorý si tipol do daného kola a ktorý sa tam reálne dostal, plus
-        +1 b za každú dvojicu súperov, ktorá sa reálne stretla. Vo finále +1 b za každého trafeného
-        finalistu a +10 b za trafeného šampióna.
+        Tvoj pavúk vychádza z tipov v sekcii Skupiny (12 víťazov skupín, 12 druhých miest a 8
+        vybraných tretích miest). Najprv v R32 vyber pre každý voľný slot jedno z tvojich tipovaných
+        tretích miest — poradie zápasov v reálnom pavúku určuje FIFA podľa kombinácie postupujúcich
+        tretích, takže si môžeš pomôcť napríklad na play.fifa.com. Potom postupne vyber víťaza
+        každého súboja. Body: v R16/štvrťfinále/semifinále získaš +1 b za každý tím, ktorý si tipol
+        do daného kola a ktorý sa tam reálne dostal, plus +1 b za každú dvojicu súperov, ktorá sa
+        reálne stretla. Vo finále +1 b za každého trafeného finalistu a +10 b za trafeného šampióna.
       </p>
 
       {points != null && breakdown && (
@@ -167,7 +211,7 @@ export default function PlayoffTab({ onGoToGroups }) {
           <button className="btn" onClick={save} disabled={saving || !ready}>
             {saving ? 'Ukladám…' : 'Uložiť tipy'}
           </button>
-          {!ready && <span className="muted">Najprv vyber šampióna.</span>}
+          {!ready && <span className="muted">Najprv priraď tretie miesta v R32 a vyber šampióna.</span>}
           {savedFlash && <span className="ok">✓ uložené</span>}
           {error && <span className="error small">{error}</span>}
         </div>

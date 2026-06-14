@@ -3,6 +3,10 @@ import mongoose from 'mongoose';
 const playoffPredictionSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true, index: true },
+    // Player-assigned group letters for the 8 "best 3rd place" R32 slots
+    // (see lib/bracket.js R32_SLOTS); null entries for slots not yet picked
+    // or not applicable (fixed pairs).
+    thirdPicks: { type: [String], default: () => Array(16).fill(null) },
     r32Winners: { type: [String], default: [] },
     r16Winners: { type: [String], default: [] },
     qfWinners: { type: [String], default: [] },

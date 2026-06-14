@@ -55,20 +55,55 @@ export function PlaceholderCard() {
   );
 }
 
-function MatchCard({ pair, winner, disabled, onPick, scores }) {
+// Dropdown for assigning one of the player's predicted "best 3rd place"
+// teams to an R32 wildcard slot. picker = { value, options: [{letter,
+// team}], onChange }.
+function ThirdPicker({ picker, disabled }) {
+  return (
+    <select
+      className="bracket-team third-picker"
+      value={picker.value || ''}
+      disabled={disabled}
+      onChange={(e) => picker.onChange(e.target.value || null)}
+    >
+      <option value="">Vyber 3. miesto…</option>
+      {picker.options.map((opt) => (
+        <option key={opt.letter} value={opt.letter}>
+          {opt.team} ({opt.letter})
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// picker (R32 only): { [pairIndex 1]: { value, options, onChange } } for the
+// match's "best 3rd place" slot, if it's one of the 8 wildcard slots.
+function MatchCard({ pair, winner, disabled, onPick, scores, picker }) {
   if (!pair) return <PlaceholderCard />;
+  const incomplete = pair.some((team) => team == null);
   return (
     <div className="bracket-pair">
-      {pair.map((team, idx) => (
-        <TeamRow
-          key={team}
-          team={team}
-          selected={winner === team}
-          disabled={disabled}
-          onClick={onPick ? () => onPick(team) : undefined}
-          score={scores ? scores[idx] : null}
-        />
-      ))}
+      {pair.map((team, idx) => {
+        if (team == null) {
+          if (idx === 1 && picker) return <ThirdPicker key="picker" picker={picker} disabled={disabled} />;
+          return (
+            <div key={`ph-${idx}`} className="bracket-team placeholder">
+              <span className="flag">❔</span>
+              <span className="team-name">?</span>
+            </div>
+          );
+        }
+        return (
+          <TeamRow
+            key={team}
+            team={team}
+            selected={winner === team}
+            disabled={disabled || incomplete}
+            onClick={onPick && !incomplete ? () => onPick(team) : undefined}
+            score={scores ? scores[idx] : null}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -77,7 +112,7 @@ function MatchCard({ pair, winner, disabled, onPick, scores }) {
 // matches grouped into pairs (`.bt-pair`) so each pair can grow/shrink
 // together with CSS, which is what keeps the connector lines aligned with
 // the midpoint of the two matches feeding the next round.
-export function TreeRound({ label, roundKey, pairs, winners, scores, count, locked, onPick, isFinal, isFirst }) {
+export function TreeRound({ label, roundKey, pairs, winners, scores, count, locked, onPick, isFinal, isFirst, pickers }) {
   const roundClass = `bt-round ${isFirst ? 'bt-r32' : ''}`;
 
   if (isFinal) {
@@ -111,6 +146,7 @@ export function TreeRound({ label, roundKey, pairs, winners, scores, count, lock
                   disabled={locked}
                   onPick={onPick ? (team) => onPick(roundKey, i, team) : undefined}
                   scores={scoreGroups ? scoreGroups[gi]?.[j] : null}
+                  picker={pickers?.[i]}
                 />
               </div>
             );
@@ -136,7 +172,7 @@ export default function BracketView({ rounds, locked, onPick, onPickChampion, ac
 
       <div className="bracket">
         {ROUND_DEFS.map(({ key, label }) => {
-          const { pairs, winners, scores } = rounds[key];
+          const { pairs, winners, scores, thirdPickers } = rounds[key];
           return (
             <div key={key} className={`bracket-round ${pairs ? '' : 'bracket-locked'} ${activeRound === key ? 'active' : ''}`}>
               <h3>{label}</h3>
@@ -153,6 +189,7 @@ export default function BracketView({ rounds, locked, onPick, onPickChampion, ac
                       disabled={locked}
                       onPick={onPick ? (team) => onPick(key, i, team) : undefined}
                       scores={showScores ? scores?.[i] : null}
+                      picker={thirdPickers?.[i]}
                     />
                   ))}
                 </div>
@@ -183,7 +220,7 @@ export default function BracketView({ rounds, locked, onPick, onPickChampion, ac
       {/* Desktop: full bracket tree, all rounds side by side */}
       <div className="bracket-tree">
         {ROUND_DEFS.map(({ key, label, tab }, idx) => {
-          const { pairs, winners, scores } = rounds[key];
+          const { pairs, winners, scores, thirdPickers } = rounds[key];
           const counts = { r32: 16, r16: 8, qf: 4, sf: 2 };
           return (
             <TreeRound
@@ -197,6 +234,7 @@ export default function BracketView({ rounds, locked, onPick, onPickChampion, ac
               locked={locked}
               onPick={onPick}
               isFirst={idx === 0}
+              pickers={thirdPickers}
             />
           );
         })}

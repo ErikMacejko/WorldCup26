@@ -489,6 +489,21 @@ h2 { margin-top: 0; }
 .bracket-team.placeholder { opacity: 0.3; cursor: default; }
 .bracket-team.placeholder:hover { background: rgba(255,255,255,0.05); color: var(--muted); }
 
+/* R32 "best 3rd place" picker — a <select> styled to match .bracket-team */
+.bracket-team.third-picker {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.bracket-team.third-picker:focus { color: var(--text); outline: none; border-color: var(--accent); }
+.bracket-team.third-picker:disabled { cursor: not-allowed; opacity: 0.6; }
+.bracket-team.third-picker option { color: #0b1220; }
+@media (min-width: 1001px) {
+  .bt-match-wrap .bracket-team.third-picker { font-size: 0.85rem; }
+}
+
 /* Admin: Skupiny tab */
 .group-lock-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { GroupPrediction } from '../models/GroupPrediction.js';
 import { PlayoffPrediction } from '../models/PlayoffPrediction.js';
 import { GroupResult } from '../models/GroupResult.js';
-import { buildBracket32, isBracketComplete } from '../lib/bracket.js';
+import { buildBracket32, isBracketComplete, isThirdPicksComplete, thirdSlotOptions } from '../lib/bracket.js';
 import { getThirdAdvancesLetters } from '../lib/groupScoring.js';
 import { requireAuth, requireNickname } from '../middleware/auth.js';
 
@@ -29,10 +29,15 @@ router.get('/mine', requireAuth, async (req, res) => {
 
   const groups = gp?.groups || {};
   const thirds = getThirdAdvancesLetters(groups);
-  const bracket = isBracketComplete(groups, thirds) ? buildBracket32(groups, thirds) : null;
+  const complete = isBracketComplete(groups, thirds);
+  const thirdPicks = pp?.thirdPicks || Array(16).fill(null);
+  const bracket = complete ? buildBracket32(groups, thirdPicks) : null;
+  const thirdOptions = complete ? thirdSlotOptions(groups, thirds) : {};
 
   res.json({
     bracket,
+    thirdPicks,
+    thirdOptions,
     r32Winners: pp?.r32Winners || [],
     r16Winners: pp?.r16Winners || [],
     qfWinners: pp?.qfWinners || [],
@@ -55,9 +60,14 @@ router.put('/mine', requireAuth, requireNickname, async (req, res) => {
   if (!isBracketComplete(groups, thirds)) {
     return res.status(409).json({ error: 'groups_incomplete' });
   }
-  const bracket = buildBracket32(groups, thirds); // 16 R32 pairs
 
   const body = req.body || {};
+  const thirdPicks = body.thirdPicks;
+  if (!isThirdPicksComplete(thirds, thirdPicks)) {
+    return res.status(400).json({ error: 'invalid_third_picks' });
+  }
+  const bracket = buildBracket32(groups, thirdPicks); // 16 R32 pairs
+
   const r32Winners = body.r32Winners;
   if (!Array.isArray(r32Winners) || r32Winners.length !== 16) {
     return res.status(400).json({ error: 'invalid_r32' });
@@ -93,12 +103,14 @@ router.put('/mine', requireAuth, requireNickname, async (req, res) => {
 
   const pred = await PlayoffPrediction.findOneAndUpdate(
     { user: req.user._id },
-    { r32Winners, r16Winners, qfWinners, sfWinners, champion, points: null, breakdown: null },
+    { thirdPicks, r32Winners, r16Winners, qfWinners, sfWinners, champion, points: null, breakdown: null },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
 
   res.json({
     bracket,
+    thirdPicks: pred.thirdPicks,
+    thirdOptions: thirdSlotOptions(groups, thirds),
     r32Winners: pred.r32Winners,
     r16Winners: pred.r16Winners,
     qfWinners: pred.qfWinners,
