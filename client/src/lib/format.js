@@ -58,8 +58,14 @@ export function teamCode(team) {
   return CODES[team] || team.slice(0, 3).toUpperCase();
 }
 
+// All dates/times are displayed in CET/CEST (Europe/Bratislava), regardless
+// of the viewer's browser timezone, since the tournament schedule is
+// published and discussed in CET.
+const TIME_ZONE = 'Europe/Bratislava';
+
 export function fmtDateTime(iso) {
   return new Date(iso).toLocaleString('sk-SK', {
+    timeZone: TIME_ZONE,
     weekday: 'short',
     day: 'numeric',
     month: 'numeric',
@@ -70,6 +76,7 @@ export function fmtDateTime(iso) {
 
 export function fmtTime(iso) {
   return new Date(iso).toLocaleTimeString('sk-SK', {
+    timeZone: TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -77,6 +84,7 @@ export function fmtTime(iso) {
 
 export function fmtDay(iso) {
   return new Date(iso).toLocaleDateString('sk-SK', {
+    timeZone: TIME_ZONE,
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -109,9 +117,10 @@ export function buildWeeks(matches) {
       start: w.start,
       end,
       label: `${w.start.toLocaleDateString('sk-SK', {
+        timeZone: TIME_ZONE,
         day: 'numeric',
         month: 'numeric',
-      })} – ${end.toLocaleDateString('sk-SK', { day: 'numeric', month: 'numeric' })}`,
+      })} – ${end.toLocaleDateString('sk-SK', { timeZone: TIME_ZONE, day: 'numeric', month: 'numeric' })}`,
       matches: w.matches.sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff)),
     };
   });

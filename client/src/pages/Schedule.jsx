@@ -17,7 +17,7 @@ export default function Schedule() {
   const days = useMemo(() => {
     const map = new Map();
     for (const m of matches) {
-      const key = new Date(m.kickoff).toLocaleDateString('sk-SK');
+      const key = new Date(m.kickoff).toLocaleDateString('sk-SK', { timeZone: 'Europe/Bratislava' });
       if (!map.has(key)) map.set(key, { date: m.kickoff, matches: [] });
       map.get(key).matches.push(m);
     }

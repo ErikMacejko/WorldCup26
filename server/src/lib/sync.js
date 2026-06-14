@@ -35,14 +35,16 @@ function resultFromScore(score) {
   return { home, away, penaltyWinner };
 }
 
-// Group-stage results (matchNumber 1-72): match finished API matches onto
-// our Match docs by (group, {homeTeam, awayTeam}) as an unordered pair, so
-// either orientation is handled.
+// Group-stage matches (matchNumber 1-72): match API matches onto our Match
+// docs by (group, {homeTeam, awayTeam}) as an unordered pair, so either
+// orientation is handled. Refreshes the real kickoff time from the API for
+// every match (the seed data only has approximate hand-converted times), and
+// writes the result once the match is finished.
 async function syncGroupMatches(apiMatches) {
   const ourMatches = await Match.find({ stage: 'group' });
 
   for (const am of apiMatches) {
-    if (am.stage !== 'GROUP_STAGE' || am.status !== 'FINISHED') continue;
+    if (am.stage !== 'GROUP_STAGE') continue;
     if (!am.group || !am.homeTeam || !am.awayTeam) continue;
 
     const match = ourMatches.find((m) => {
@@ -54,21 +56,34 @@ async function syncGroupMatches(apiMatches) {
     });
     if (!match) continue;
 
-    const result = resultFromScore(am.score);
-    if (!result) continue;
+    let changed = false;
 
-    const swapped = match.homeTeam === am.awayTeam && match.awayTeam === am.homeTeam;
-    const home = swapped ? result.away : result.home;
-    const away = swapped ? result.home : result.away;
-
-    if (match.status === 'finished' && match.result?.home === home && match.result?.away === away) {
-      continue;
+    if (am.utcDate) {
+      const newKickoff = new Date(am.utcDate);
+      if (match.kickoff.getTime() !== newKickoff.getTime()) {
+        match.kickoff = newKickoff;
+        changed = true;
+      }
     }
 
-    match.result = { home, away, penaltyWinner: null };
-    match.status = 'finished';
-    await match.save();
-    await rescoreMatch(match);
+    if (am.status === 'FINISHED') {
+      const result = resultFromScore(am.score);
+      if (result) {
+        const swapped = match.homeTeam === am.awayTeam && match.awayTeam === am.homeTeam;
+        const home = swapped ? result.away : result.home;
+        const away = swapped ? result.home : result.away;
+        if (match.status !== 'finished' || match.result?.home !== home || match.result?.away !== away) {
+          match.result = { home, away, penaltyWinner: null };
+          match.status = 'finished';
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      await match.save();
+      if (match.status === 'finished') await rescoreMatch(match);
+    }
   }
 }
 
