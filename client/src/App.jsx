@@ -35,9 +35,9 @@ function Nav() {
       </button>
       <nav className={`nav-links ${menuOpen ? 'open' : ''}`}>
         <NavLink to="/" end>Tipovačka</NavLink>
-        <NavLink to="/vysledky">Výsledky MS</NavLink>
         <NavLink to="/moje-tipy">Moje tipy</NavLink>
-        <NavLink to="/leaderboard">Poradie</NavLink>
+        <NavLink to="/leaderboard">Tabuľka</NavLink>
+        <NavLink to="/vysledky">Výsledky MS</NavLink>
         {user.isAdmin && <NavLink to="/admin">Admin</NavLink>}
       </nav>
       <div className="nav-user">
