@@ -6,7 +6,6 @@ import Nickname from './pages/Nickname.jsx';
 import Tipovacka from './pages/Tipovacka.jsx';
 import Vysledky from './pages/Vysledky.jsx';
 import MyTips from './pages/MyTips.jsx';
-import Schedule from './pages/Schedule.jsx';
 import Leaderboard from './pages/Leaderboard.jsx';
 import Admin from './pages/Admin.jsx';
 
@@ -38,7 +37,6 @@ function Nav() {
         <NavLink to="/" end>Tipovačka</NavLink>
         <NavLink to="/vysledky">Výsledky MS</NavLink>
         <NavLink to="/moje-tipy">Moje tipy</NavLink>
-        <NavLink to="/schedule">Rozpis</NavLink>
         <NavLink to="/leaderboard">Poradie</NavLink>
         {user.isAdmin && <NavLink to="/admin">Admin</NavLink>}
       </nav>
@@ -102,14 +100,6 @@ export default function App() {
             element={
               <Protected>
                 <MyTips />
-              </Protected>
-            }
-          />
-          <Route
-            path="/schedule"
-            element={
-              <Protected>
-                <Schedule />
               </Protected>
             }
           />
