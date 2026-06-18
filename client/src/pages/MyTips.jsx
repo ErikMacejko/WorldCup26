@@ -47,13 +47,19 @@ export default function MyTips() {
                   <td>{m.matchNumber}</td>
                   <td className="muted small mytips-date">{fmtDateTime(m.kickoff)}</td>
                   <td>
-                    {flag(m.homeTeam)}{' '}
-                    <span className="cc-full">{m.homeTeam}</span>
-                    <span className="cc-short">{teamCode(m.homeTeam)}</span>
-                    {' – '}
-                    <span className="cc-full">{m.awayTeam}</span>
-                    <span className="cc-short">{teamCode(m.awayTeam)}</span>
-                    {' '}{flag(m.awayTeam)}
+                    <div className="mytips-match">
+                      <span className="mytips-team mytips-home">
+                        <span className="cc-full">{m.homeTeam}</span>
+                        <span className="cc-short">{teamCode(m.homeTeam)}</span>
+                      </span>
+                      <span className="flag">{flag(m.homeTeam)}</span>
+                      <span className="vs">–</span>
+                      <span className="flag">{flag(m.awayTeam)}</span>
+                      <span className="mytips-team mytips-away">
+                        <span className="cc-full">{m.awayTeam}</span>
+                        <span className="cc-short">{teamCode(m.awayTeam)}</span>
+                      </span>
+                    </div>
                   </td>
                   <td>{pred ? `${pred.homeScore}:${pred.awayScore}` : '—'}</td>
                   <td>{m.result ? `${m.result.home}:${m.result.away}` : '—'}</td>

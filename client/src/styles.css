@@ -217,6 +217,13 @@ h2 { margin-top: 0; }
 .others-row .tip { font-weight: 600; }
 .others-row .pts { color: var(--muted); min-width: 30px; text-align: right; }
 
+/* MyTips match cell */
+.mytips-match { display: grid; grid-template-columns: 1fr auto auto auto 1fr; align-items: center; gap: 0.4rem; }
+.mytips-team { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mytips-home { text-align: right; }
+.mytips-away { text-align: left; }
+.mytips-match .flag { font-size: 1.1rem; }
+
 /* Schedule */
 .sched-day { margin-bottom: 1rem; }
 .sched-date { text-transform: capitalize; margin: 0.75rem 0 0.4rem; font-size: 1rem; color: var(--accent-2); }
