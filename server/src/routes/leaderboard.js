@@ -45,12 +45,12 @@ router.get('/', requireAuth, async (req, res) => {
       const playoffPoints = playoffByUser.get(u._id.toString()) || 0;
       return {
         nickname: u.nickname,
+        exact: m?.exact || 0,
         matchPoints,
         groupPoints,
         playoffPoints,
-        totalPoints: matchPoints + groupPoints + playoffPoints,
-        scored: m?.scored || 0,
-        exact: m?.exact || 0,
+        scored: m?.scored || 0, 
+        totalPoints: matchPoints + groupPoints + playoffPoints
       };
     })
     .sort(
