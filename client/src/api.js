@@ -70,6 +70,7 @@ export const api = {
   admin: {
     users: () => req('/admin/users'),
     user: (id) => req(`/admin/users/${id}`),
+    playoff: (id) => req(`/admin/users/${id}/playoff`),
     toggleHide: (id) => req(`/admin/users/${id}/toggle-hide`, { method: 'POST' }),
     toggleBlock: (id) => req(`/admin/users/${id}/toggle-block`, { method: 'POST' }),
     matches: () => req('/admin/matches'),

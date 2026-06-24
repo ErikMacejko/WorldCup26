@@ -4,6 +4,7 @@ import { PlayoffPrediction } from '../models/PlayoffPrediction.js';
 import { GroupResult } from '../models/GroupResult.js';
 import { buildBracket32, isBracketComplete, isThirdPicksComplete, thirdSlotOptions } from '../lib/bracket.js';
 import { getThirdAdvancesLetters } from '../lib/groupScoring.js';
+import { getPlayoffView } from '../lib/playoffView.js';
 import { requireAuth, requireNickname } from '../middleware/auth.js';
 
 const router = Router();
@@ -21,32 +22,7 @@ function pairsFromWinners(prevPairs, winners) {
 
 // The current user's derived 32-team bracket + saved Playoff prediction.
 router.get('/mine', requireAuth, async (req, res) => {
-  const [gp, pp, groupResult] = await Promise.all([
-    GroupPrediction.findOne({ user: req.user._id }),
-    PlayoffPrediction.findOne({ user: req.user._id }),
-    GroupResult.getSingleton(),
-  ]);
-
-  const groups = gp?.groups || {};
-  const thirds = getThirdAdvancesLetters(groups);
-  const complete = isBracketComplete(groups, thirds);
-  const thirdPicks = pp?.thirdPicks || Array(16).fill(null);
-  const bracket = complete ? buildBracket32(groups, thirdPicks) : null;
-  const thirdOptions = complete ? thirdSlotOptions(groups, thirds) : {};
-
-  res.json({
-    bracket,
-    thirdPicks,
-    thirdOptions,
-    r32Winners: pp?.r32Winners || [],
-    r16Winners: pp?.r16Winners || [],
-    qfWinners: pp?.qfWinners || [],
-    sfWinners: pp?.sfWinners || [],
-    champion: pp?.champion || null,
-    points: pp?.points ?? null,
-    breakdown: pp?.breakdown ?? null,
-    locked: groupResult.predictionsLocked,
-  });
+  res.json(await getPlayoffView(req.user._id));
 });
 
 // Save the full round-by-round bracket picks.

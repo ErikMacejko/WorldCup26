@@ -2,8 +2,10 @@ import { Router } from 'express';
 import { User } from '../models/User.js';
 import { Match } from '../models/Match.js';
 import { Prediction } from '../models/Prediction.js';
+import { PlayoffPrediction } from '../models/PlayoffPrediction.js';
 import { GroupResult } from '../models/GroupResult.js';
 import { syncResults } from '../lib/sync.js';
+import { getPlayoffView } from '../lib/playoffView.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
@@ -12,16 +14,20 @@ router.use(requireAuth, requireAdmin);
 // Overview of all players with quick stats.
 router.get('/users', async (req, res) => {
   const users = await User.find().sort({ createdAt: 1 });
-  const agg = await Prediction.aggregate([
-    {
-      $group: {
-        _id: '$user',
-        predictions: { $sum: 1 },
-        totalPoints: { $sum: { $ifNull: ['$points', 0] } },
+  const [agg, playoffPreds] = await Promise.all([
+    Prediction.aggregate([
+      {
+        $group: {
+          _id: '$user',
+          predictions: { $sum: 1 },
+          totalPoints: { $sum: { $ifNull: ['$points', 0] } },
+        },
       },
-    },
+    ]),
+    PlayoffPrediction.find({}, 'user champion'),
   ]);
   const stats = new Map(agg.map((a) => [a._id.toString(), a]));
+  const champions = new Map(playoffPreds.map((p) => [p.user.toString(), p.champion]));
 
   res.json(
     users.map((u) => {
@@ -38,6 +44,7 @@ router.get('/users', async (req, res) => {
         createdAt: u.createdAt,
         predictions: s?.predictions || 0,
         totalPoints: s?.totalPoints || 0,
+        champion: champions.get(u._id.toString()) || null,
       };
     })
   );
@@ -88,6 +95,13 @@ router.get('/users/:id', async (req, res) => {
     loginHistory: [...user.loginHistory].reverse().slice(0, 50),
     predictions,
   });
+});
+
+// A player's derived playoff bracket + champion pick, for the detail panel.
+router.get('/users/:id/playoff', async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({ error: 'not_found' });
+  res.json(await getPlayoffView(user._id));
 });
 
 // Hide / un-hide a user from the leaderboard.

@@ -3,6 +3,50 @@ import { createPortal } from 'react-dom';
 import { api } from '../api.js';
 import { stageLabel, flag, teamCode, fmtDateTime } from '../lib/format.js';
 import GroupsAdminTab from './admin/GroupsAdminTab.jsx';
+import BracketView, { deriveBracketState } from '../components/BracketTree.jsx';
+
+function TeamTag({ team }) {
+  if (!team) return <span className="muted">—</span>;
+  return (
+    <>
+      <span className="flag">{flag(team)}</span>
+      <span className="cc-full">{team}</span>
+      <span className="cc-short">{teamCode(team)}</span>
+    </>
+  );
+}
+
+// Read-only pavúk for one player, derived from their saved playoff picks.
+function PlayoffSummary({ id }) {
+  const [data, setData] = useState(null);
+  const [activeRound, setActiveRound] = useState('r32');
+
+  useEffect(() => {
+    setData(null);
+    api.admin.playoff(id).then(setData);
+  }, [id]);
+
+  if (!data) return <div className="muted small">Načítavam pavúk…</div>;
+
+  return (
+    <>
+      <h4>
+        Pavúk — šampión: <TeamTag team={data.champion} />
+        {data.points != null && <span className="muted"> ({data.points} b)</span>}
+      </h4>
+      {!data.bracket ? (
+        <p className="muted small">Hráč ešte nedokončil tipovanie skupín, pavúk nie je k dispozícii.</p>
+      ) : (
+        <BracketView
+          rounds={deriveBracketState(data.bracket, data)}
+          locked
+          activeRound={activeRound}
+          onActiveRoundChange={setActiveRound}
+        />
+      )}
+    </>
+  );
+}
 
 function UserDetail({ id, onChanged }) {
   const [data, setData] = useState(null);
@@ -109,6 +153,8 @@ function UserDetail({ id, onChanged }) {
           )}
         </tbody>
       </table>
+
+      <PlayoffSummary id={id} />
     </div>
   );
 }
@@ -133,6 +179,7 @@ function UsersTab() {
               <th>Prezývka</th>
               <th className="num">Body</th>
               <th className="num">Tipov</th>
+              <th>Šampión</th>
               <th>Stav</th>
             </tr>
           </thead>
@@ -149,6 +196,7 @@ function UsersTab() {
                 </td>
                 <td className="num">{u.totalPoints}</td>
                 <td className="num">{u.predictions}</td>
+                <td><TeamTag team={u.champion} /></td>
                 <td>
                   {u.blocked && <span className="tag danger">blok</span>}
                   {u.hiddenFromLeaderboard && <span className="tag warn">skrytý</span>}

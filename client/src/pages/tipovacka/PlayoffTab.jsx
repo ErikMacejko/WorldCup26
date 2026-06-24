@@ -1,37 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api.js';
-import BracketView, { toPairs } from '../../components/BracketTree.jsx';
+import BracketView, { deriveBracketState } from '../../components/BracketTree.jsx';
 
 function normalize(arr, size) {
   const out = Array(size).fill(null);
   for (let i = 0; i < Math.min(size, arr?.length || 0); i++) out[i] = arr[i] || null;
-  return out;
-}
-
-// Derives each round's pairs from the previous round's (sanitized) winners,
-// and drops any stored winner that's no longer part of its pair.
-function deriveBracketState(bracket, raw) {
-  const out = {};
-
-  const r32 = raw.r32Winners.map((w, i) => (bracket[i]?.includes(w) ? w : null));
-  out.r32 = { pairs: bracket, winners: r32 };
-
-  const r16Pairs = r32.every((w) => w != null) ? toPairs(r32) : null;
-  const r16 = raw.r16Winners.map((w, i) => (r16Pairs?.[i]?.includes(w) ? w : null));
-  out.r16 = { pairs: r16Pairs, winners: r16 };
-
-  const qfPairs = r16Pairs && r16.every((w) => w != null) ? toPairs(r16) : null;
-  const qf = raw.qfWinners.map((w, i) => (qfPairs?.[i]?.includes(w) ? w : null));
-  out.qf = { pairs: qfPairs, winners: qf };
-
-  const sfPairs = qfPairs && qf.every((w) => w != null) ? toPairs(qf) : null;
-  const sf = raw.sfWinners.map((w, i) => (sfPairs?.[i]?.includes(w) ? w : null));
-  out.sf = { pairs: sfPairs, winners: sf };
-
-  const finalPairs = sfPairs && sf.every((w) => w != null) ? toPairs(sf) : null;
-  const champion = finalPairs && finalPairs[0].includes(raw.champion) ? raw.champion : null;
-  out.final = { pairs: finalPairs, winner: champion };
-
   return out;
 }
 

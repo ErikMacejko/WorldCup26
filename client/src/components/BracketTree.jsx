@@ -15,6 +15,46 @@ export function toPairs(arr) {
   return out;
 }
 
+// Right-pads/truncates `arr` to exactly `size` entries (missing/falsy slots
+// become null). Without this, a round whose winners array is shorter than
+// its pair count (e.g. `[]` for a player who hasn't picked anything yet)
+// makes `.every()` vacuously true below, which falsely marks the round
+// "complete" and crashes the next round's `pairs[0].includes(...)` lookup.
+function padNulls(arr, size) {
+  const out = Array(size).fill(null);
+  for (let i = 0; i < Math.min(size, arr?.length || 0); i++) out[i] = arr[i] || null;
+  return out;
+}
+
+// Derives each round's pairs from the previous round's (sanitized) winners,
+// and drops any stored winner that's no longer part of its pair. `raw` is a
+// PlayoffPrediction-shaped object: { r32Winners, r16Winners, qfWinners,
+// sfWinners, champion }.
+export function deriveBracketState(bracket, raw) {
+  const out = {};
+
+  const r32 = padNulls(raw.r32Winners, 16).map((w, i) => (bracket[i]?.includes(w) ? w : null));
+  out.r32 = { pairs: bracket, winners: r32 };
+
+  const r16Pairs = r32.every((w) => w != null) ? toPairs(r32) : null;
+  const r16 = padNulls(raw.r16Winners, 8).map((w, i) => (r16Pairs?.[i]?.includes(w) ? w : null));
+  out.r16 = { pairs: r16Pairs, winners: r16 };
+
+  const qfPairs = r16Pairs && r16.every((w) => w != null) ? toPairs(r16) : null;
+  const qf = padNulls(raw.qfWinners, 4).map((w, i) => (qfPairs?.[i]?.includes(w) ? w : null));
+  out.qf = { pairs: qfPairs, winners: qf };
+
+  const sfPairs = qfPairs && qf.every((w) => w != null) ? toPairs(qf) : null;
+  const sf = padNulls(raw.sfWinners, 2).map((w, i) => (sfPairs?.[i]?.includes(w) ? w : null));
+  out.sf = { pairs: sfPairs, winners: sf };
+
+  const finalPairs = sfPairs && sf.every((w) => w != null) ? toPairs(sf) : null;
+  const champion = finalPairs && finalPairs[0].includes(raw.champion) ? raw.champion : null;
+  out.final = { pairs: finalPairs, winner: champion };
+
+  return out;
+}
+
 // A team slot: a clickable button when `onClick` is given (prediction
 // bracket), or a read-only div otherwise (real-results bracket). Both use
 // the same `.bracket-team`/`.selected`/`.placeholder` styles.
