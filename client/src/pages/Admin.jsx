@@ -170,7 +170,7 @@ function UsersTab() {
   );
 }
 
-// Opened via "Odomknúť" on a finished match: lets the admin pick which
+// Opened via "Odomknúť" on a locked match: lets the admin pick which
 // players get a one-shot back-fill for this locked match (the result itself
 // is auto-synced and shown read-only here).
 function BackfillPicker({ match, players, onClose, onSaved }) {
@@ -267,6 +267,7 @@ function ResultRow({ match, players, onSaved }) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const finished = match.status === 'finished';
+  const locked = match.locked;
   const result =
     match.result?.home != null && match.result?.away != null
       ? `${match.result.home}:${match.result.away}`
@@ -297,7 +298,7 @@ function ResultRow({ match, players, onSaved }) {
           <span className="cc-short">{teamCode(match.awayTeam)}</span>
         </td>
         <td>
-          {!finished ? (
+          {!locked ? (
             <span className="muted small">otvorené</span>
           ) : match.backfillFor.length > 0 ? (
             <span className="tag warn">odomknuté ({match.backfillFor.length})</span>
@@ -306,7 +307,7 @@ function ResultRow({ match, players, onSaved }) {
           )}
         </td>
         <td>
-          {finished && (
+          {locked && (
             <button className="btn-sm" onClick={() => setPickerOpen((v) => !v)}>
               Odomknúť
             </button>
