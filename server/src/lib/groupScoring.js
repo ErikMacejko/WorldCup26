@@ -1,7 +1,5 @@
 // Scoring for the Skupiny (group-order) predictions.
 
-import { isBracketComplete } from './bracket.js';
-
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 
 // groups: { [letter]: { order: [4 team names], thirdAdvances: bool } }
@@ -25,33 +23,48 @@ export function computeGroupOrderPoints(predictedOrder, realOrder) {
 
 // predictedGroups / realGroups: { [letter]: { order: [4 team names] } }
 // predictedThirds / realThirds: arrays of group letters whose 3rd place advances
-// Returns { total, perGroup: { [letter]: points }, thirdsBonus }, total max 68.
-export function computeGroupPoints(predictedGroups, predictedThirds, realGroups, realThirds) {
+// completedLetters: group letters whose real order is final - groups not yet
+// finished score null (hidden) instead of 0, and don't count toward total.
+// Returns { total, perGroup: { [letter]: points|null }, thirdsBonus }.
+export function computeGroupPoints(predictedGroups, predictedThirds, realGroups, realThirds, completedLetters) {
+  const completedSet = new Set(completedLetters || LETTERS);
   const perGroup = {};
   let total = 0;
   for (const letter of LETTERS) {
+    if (!completedSet.has(letter)) {
+      perGroup[letter] = null;
+      continue;
+    }
     const pts = computeGroupOrderPoints(predictedGroups?.[letter]?.order, realGroups?.[letter]?.order);
     perGroup[letter] = pts;
     total += pts;
   }
 
-  const realSet = new Set(realThirds || []);
-  let thirdsBonus = 0;
-  for (const letter of predictedThirds || []) {
-    if (realSet.has(letter)) thirdsBonus += 1;
+  // The "best 3rd place" ranking is inherently cross-group, so it's only
+  // known once the entire group stage has finished (realThirds.length === 8).
+  let thirdsBonus = null;
+  if ((realThirds || []).length === 8) {
+    const realSet = new Set(realThirds);
+    thirdsBonus = 0;
+    for (const letter of predictedThirds || []) {
+      if (realSet.has(letter)) thirdsBonus += 1;
+    }
+    total += thirdsBonus;
   }
-  total += thirdsBonus;
 
   return { total, perGroup, thirdsBonus };
 }
 
-// Scores a player's GroupPrediction against the admin-entered GroupResult.
-// Returns { points: null, perGroup: null, thirdsBonus: null } while the
-// reference data is incomplete (all 12 groups + exactly 8 advancing thirds).
+// Scores a player's GroupPrediction against the admin-entered GroupResult,
+// one group at a time as each group's real order becomes final - a player
+// gets their Group B points as soon as Group B finishes, without waiting for
+// the rest of the group stage. Returns { points: null, perGroup: null,
+// thirdsBonus: null } only while no group has finished yet.
 export function scoreGroupPrediction(predictedGroups, groupResult) {
   const realGroups = groupResult?.groups || {};
   const realThirds = groupResult?.advancingThirds || [];
-  if (!isBracketComplete(realGroups, realThirds)) {
+  const completedLetters = groupResult?.completedGroups || [];
+  if (completedLetters.length === 0) {
     return { points: null, perGroup: null, thirdsBonus: null };
   }
   const predictedThirds = getThirdAdvancesLetters(predictedGroups);
@@ -59,7 +72,8 @@ export function scoreGroupPrediction(predictedGroups, groupResult) {
     predictedGroups,
     predictedThirds,
     realGroups,
-    realThirds
+    realThirds,
+    completedLetters
   );
   return { points: total, perGroup, thirdsBonus };
 }

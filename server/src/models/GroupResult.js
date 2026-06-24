@@ -7,6 +7,10 @@ const groupResultSchema = new mongoose.Schema(
     groups: { type: mongoose.Schema.Types.Mixed, default: {} },
     // Up to 8 group letters whose 3rd-placed team advances.
     advancingThirds: { type: [String], default: [] },
+    // Letters whose group stage has fully finished (all 4 teams played all 3
+    // matches), so that group's predictions can be scored even while other
+    // groups are still in progress.
+    completedGroups: { type: [String], default: [] },
     // Global toggle: when true, players can no longer edit Skupiny/Playoff predictions.
     predictionsLocked: { type: Boolean, default: false },
     // Set by lib/sync.js after each auto-sync run against football-data.org.

@@ -145,6 +145,13 @@ async function syncKnockout(apiMatches) {
   }
 }
 
+// Letters whose group stage has fully finished (all 4 teams played their 3
+// matches), so that group's predictions can be scored on their own without
+// waiting for the rest of the group stage to end.
+function computeCompletedGroups(standings) {
+  return LETTERS.filter((l) => (standings[l] || []).every((row) => row.played === 3));
+}
+
 // Once every team in every group has played all 3 matches, rank the 12
 // third-placed teams by (points, goalDifference, goalsFor) and take the top
 // 8 letters. Known limitation: FIFA's official tiebreak also includes
@@ -187,11 +194,12 @@ export async function syncResults() {
       groups[letter] = { ...groups[letter], order };
     }
     groupResult.groups = groups;
+    groupResult.completedGroups = computeCompletedGroups(standings);
 
     // computeAdvancingThirds returns null until every team has played all 3
     // group matches - force [] in that case so isBracketComplete (and thus
-    // group/playoff scoring) stays gated until the group stage truly ends,
-    // even if a stale value was left over from earlier testing.
+    // the thirds bonus + playoff scoring) stays gated until the group stage
+    // truly ends, even if a stale value was left over from earlier testing.
     groupResult.advancingThirds = computeAdvancingThirds(standings) || [];
 
     await groupResult.save();
