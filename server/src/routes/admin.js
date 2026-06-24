@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { User } from '../models/User.js';
 import { Match } from '../models/Match.js';
 import { Prediction } from '../models/Prediction.js';
-import { PlayoffPrediction } from '../models/PlayoffPrediction.js';
+import { GroupPrediction } from '../models/GroupPrediction.js';
 import { GroupResult } from '../models/GroupResult.js';
 import { syncResults } from '../lib/sync.js';
 import { getPlayoffView } from '../lib/playoffView.js';
@@ -14,39 +14,19 @@ router.use(requireAuth, requireAdmin);
 // Overview of all players with quick stats.
 router.get('/users', async (req, res) => {
   const users = await User.find().sort({ createdAt: 1 });
-  const [agg, playoffPreds] = await Promise.all([
-    Prediction.aggregate([
-      {
-        $group: {
-          _id: '$user',
-          predictions: { $sum: 1 },
-          totalPoints: { $sum: { $ifNull: ['$points', 0] } },
-        },
-      },
-    ]),
-    PlayoffPrediction.find({}, 'user champion'),
-  ]);
-  const stats = new Map(agg.map((a) => [a._id.toString(), a]));
-  const champions = new Map(playoffPreds.map((p) => [p.user.toString(), p.champion]));
 
   res.json(
-    users.map((u) => {
-      const s = stats.get(u._id.toString());
-      return {
-        id: u._id.toString(),
-        email: u.email,
-        name: u.name,
-        nickname: u.nickname,
-        isAdmin: u.isAdmin,
-        blocked: u.blocked,
-        hiddenFromLeaderboard: u.hiddenFromLeaderboard,
-        lastLoginAt: u.lastLoginAt,
-        createdAt: u.createdAt,
-        predictions: s?.predictions || 0,
-        totalPoints: s?.totalPoints || 0,
-        champion: champions.get(u._id.toString()) || null,
-      };
-    })
+    users.map((u) => ({
+      id: u._id.toString(),
+      email: u.email,
+      name: u.name,
+      nickname: u.nickname,
+      isAdmin: u.isAdmin,
+      blocked: u.blocked,
+      hiddenFromLeaderboard: u.hiddenFromLeaderboard,
+      lastLoginAt: u.lastLoginAt,
+      createdAt: u.createdAt,
+    }))
   );
 });
 
@@ -102,6 +82,19 @@ router.get('/users/:id/playoff', async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ error: 'not_found' });
   res.json(await getPlayoffView(user._id));
+});
+
+// A player's Skupiny prediction, for the detail panel.
+router.get('/users/:id/groups', async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({ error: 'not_found' });
+  const pred = await GroupPrediction.findOne({ user: user._id });
+  res.json({
+    groups: pred?.groups || {},
+    points: pred?.points ?? null,
+    perGroup: pred?.perGroup ?? null,
+    thirdsBonus: pred?.thirdsBonus ?? null,
+  });
 });
 
 // Hide / un-hide a user from the leaderboard.

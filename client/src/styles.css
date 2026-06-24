@@ -272,14 +272,20 @@ h2 { margin-top: 0; }
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 .tabs button { background: var(--panel); border: 1px solid var(--border); color: var(--muted); padding: 0.45rem 1rem; border-radius: 8px; cursor: pointer; font: inherit; }
 .tabs button.active { background: var(--accent); color: #fff; border-color: transparent; }
-.admin-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 1rem; }
+.admin-grid { display: grid; grid-template-columns: 280px 1fr; gap: 1rem; }
 @media (max-width: 760px) { .admin-grid { grid-template-columns: 1fr; } }
+/* Fixed width regardless of which detail tab (Tipy/Skupiny/PlayOff) is
+   active, so switching tabs doesn't resize the card around the content. */
+.admin-grid .detail { width: 100%; max-width: 1100px; }
 .detail-head { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .detail-head h3 { margin: 0; }
 .detail-actions { display: flex; flex-direction: column; gap: 0.4rem; }
 .detail-status { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); margin: 0.75rem 0; }
 .login-history { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .login-chip { background: var(--panel-2); padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.75rem; }
+.detail-tabs { margin-top: 1rem; align-items: center; flex-wrap: wrap; }
+.champion-label { margin-left: auto; }
+.champion-label .flag { margin: 0 0.2rem; }
 .tag { font-size: 0.68rem; padding: 0.08rem 0.4rem; border-radius: 999px; margin-left: 0.35rem; }
 .tag.admin { background: #3b3f73; color: #c7caf5; }
 .tag.danger { background: var(--danger); color: #fff; }

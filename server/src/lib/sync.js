@@ -42,6 +42,12 @@ function resultFromScore(score) {
 // writes the result once the match is finished.
 async function syncGroupMatches(apiMatches) {
   const ourMatches = await Match.find({ stage: 'group' });
+  // Returned so the caller can derive completedGroups from these matches'
+  // actual `status`, instead of football-data.org's `standings` endpoint -
+  // that endpoint marks a team's `playedGames` as done (and bakes the
+  // in-progress score into the table) as soon as a match goes LIVE, not
+  // only once it's FINISHED, which would score a group while it's still
+  // being played.
 
   for (const am of apiMatches) {
     if (am.stage !== 'GROUP_STAGE') continue;
@@ -85,6 +91,8 @@ async function syncGroupMatches(apiMatches) {
       if (match.status === 'finished') await rescoreMatch(match);
     }
   }
+
+  return ourMatches;
 }
 
 // Knockout team assignments + results (matchNumber 73-104): each API stage's
@@ -145,21 +153,25 @@ async function syncKnockout(apiMatches) {
   }
 }
 
-// Letters whose group stage has fully finished (all 4 teams played their 3
-// matches), so that group's predictions can be scored on their own without
-// waiting for the rest of the group stage to end.
-function computeCompletedGroups(standings) {
-  return LETTERS.filter((l) => (standings[l] || []).every((row) => row.played === 3));
+// Letters whose group stage has fully finished (all 6 matches actually
+// FINISHED, per our own Match docs - see syncGroupMatches), so that group's
+// predictions can be scored on their own without waiting for the rest of
+// the group stage to end.
+function computeCompletedGroups(ourGroupMatches) {
+  return LETTERS.filter((l) => {
+    const matches = ourGroupMatches.filter((m) => m.group === l);
+    return matches.length > 0 && matches.every((m) => m.status === 'finished');
+  });
 }
 
-// Once every team in every group has played all 3 matches, rank the 12
-// third-placed teams by (points, goalDifference, goalsFor) and take the top
-// 8 letters. Known limitation: FIFA's official tiebreak also includes
-// fair-play points and a draw of lots for true ties, which the free API
-// doesn't expose - astronomically unlikely to matter in practice.
-function computeAdvancingThirds(standings) {
-  const allPlayed = LETTERS.every((l) => (standings[l] || []).every((row) => row.played === 3));
-  if (!allPlayed) return null;
+// Once every group has actually finished (all matches FINISHED, not just
+// live), rank the 12 third-placed teams by (points, goalDifference,
+// goalsFor) and take the top 8 letters. Known limitation: FIFA's official
+// tiebreak also includes fair-play points and a draw of lots for true ties,
+// which the free API doesn't expose - astronomically unlikely to matter in
+// practice.
+function computeAdvancingThirds(standings, completedGroups) {
+  if (completedGroups.length !== LETTERS.length) return null;
 
   const thirds = LETTERS.map((letter) => {
     const row = standings[letter]?.[2];
@@ -181,7 +193,7 @@ export async function syncResults() {
   try {
     const [standings, apiMatches] = await Promise.all([fetchStandings(), fetchMatches()]);
 
-    await syncGroupMatches(apiMatches);
+    const ourGroupMatches = await syncGroupMatches(apiMatches);
 
     const groups = { ...groupResult.groups };
     for (const letter of LETTERS) {
@@ -194,13 +206,14 @@ export async function syncResults() {
       groups[letter] = { ...groups[letter], order };
     }
     groupResult.groups = groups;
-    groupResult.completedGroups = computeCompletedGroups(standings);
+    const completedGroups = computeCompletedGroups(ourGroupMatches);
+    groupResult.completedGroups = completedGroups;
 
-    // computeAdvancingThirds returns null until every team has played all 3
-    // group matches - force [] in that case so isBracketComplete (and thus
-    // the thirds bonus + playoff scoring) stays gated until the group stage
+    // computeAdvancingThirds returns null until every group has actually
+    // finished - force [] in that case so isBracketComplete (and thus the
+    // thirds bonus + playoff scoring) stays gated until the group stage
     // truly ends, even if a stale value was left over from earlier testing.
-    groupResult.advancingThirds = computeAdvancingThirds(standings) || [];
+    groupResult.advancingThirds = computeAdvancingThirds(standings, completedGroups) || [];
 
     await groupResult.save();
 

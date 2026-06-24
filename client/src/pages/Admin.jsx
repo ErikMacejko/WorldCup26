@@ -16,6 +16,24 @@ function TeamTag({ team }) {
   );
 }
 
+// Shown next to the "PlayOff" tab in the detail panel, independent of
+// whether that tab is actually open.
+function ChampionLabel({ id }) {
+  const [champion, setChampion] = useState(undefined);
+
+  useEffect(() => {
+    setChampion(undefined);
+    api.admin.playoff(id).then((d) => setChampion(d.champion));
+  }, [id]);
+
+  if (champion === undefined) return null;
+  return (
+    <span className="champion-label muted">
+      Šampión: <TeamTag team={champion} />
+    </span>
+  );
+}
+
 // Read-only pavúk for one player, derived from their saved playoff picks.
 function PlayoffSummary({ id }) {
   const [data, setData] = useState(null);
@@ -27,29 +45,87 @@ function PlayoffSummary({ id }) {
   }, [id]);
 
   if (!data) return <div className="muted small">Načítavam pavúk…</div>;
+  if (!data.bracket) {
+    return <p className="muted small">Hráč ešte nedokončil tipovanie skupín, pavúk nie je k dispozícii.</p>;
+  }
 
   return (
     <>
-      <h4>
-        Pavúk — šampión: <TeamTag team={data.champion} />
-        {data.points != null && <span className="muted"> ({data.points} b)</span>}
-      </h4>
-      {!data.bracket ? (
-        <p className="muted small">Hráč ešte nedokončil tipovanie skupín, pavúk nie je k dispozícii.</p>
-      ) : (
-        <BracketView
-          rounds={deriveBracketState(data.bracket, data)}
-          locked
-          activeRound={activeRound}
-          onActiveRoundChange={setActiveRound}
-        />
+      {data.points != null && <p className="muted small">Body za playoff: {data.points} b</p>}
+      <BracketView
+        rounds={deriveBracketState(data.bracket, data)}
+        locked
+        activeRound={activeRound}
+        onActiveRoundChange={setActiveRound}
+      />
+    </>
+  );
+}
+
+const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+
+function ptsTagClass(pts, max) {
+  return pts === max ? 'pts-max' : pts > 0 ? 'pts-good' : 'pts-zero';
+}
+
+// Read-only Skupiny order for one player, derived from their saved picks.
+function GroupsSummary({ id }) {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    setData(null);
+    api.admin.groups(id).then(setData);
+  }, [id]);
+
+  if (!data) return <div className="muted small">Načítavam skupiny…</div>;
+
+  const letters = LETTERS.filter((l) => data.groups?.[l]?.order?.length === 4);
+  if (letters.length === 0) {
+    return <p className="muted small">Hráč ešte nedokončil tipovanie skupín.</p>;
+  }
+
+  return (
+    <>
+      {data.points != null && (
+        <p className="muted small">
+          Body za skupiny: {data.points} b
+          {data.thirdsBonus != null && ` · z toho tretie miesta: ${data.thirdsBonus} b`}
+        </p>
       )}
+      <div className="groups-grid">
+        {letters.map((letter) => {
+          const g = data.groups[letter];
+          const pts = data.perGroup?.[letter];
+          return (
+            <div key={letter} className="group-card">
+              <div className="group-card-header">
+                <h3>Skupina {letter}</h3>
+                {pts != null && <span className={`pts-tag ${ptsTagClass(pts, 5)}`}>+{pts} b</span>}
+              </div>
+              <div className="group-rank-list">
+                {g.order.map((team, i) => (
+                  <div key={team} className="group-rank-row">
+                    <span className="rank-num">{i + 1}.</span>
+                    <span className="flag">{flag(team)}</span>
+                    <span className="team-name">
+                      <span className="cc-full">{team}</span>
+                      <span className="cc-short">{teamCode(team)}</span>
+                    </span>
+                    {i === 2 && g.thirdAdvances && <span className="tag">postupuje</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </>
   );
 }
 
 function UserDetail({ id, onChanged }) {
   const [data, setData] = useState(null);
+  const [tab, setTab] = useState('tipy');
 
   async function load() {
     setData(await api.admin.user(id));
@@ -115,46 +191,61 @@ function UserDetail({ id, onChanged }) {
         ))}
       </div>
 
-      <h4>Tipy ({data.predictions.length})</h4>
-      <table className="table small">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Zápas</th>
-            <th>Tip</th>
-            <th>Výsledok</th>
-            <th className="num">Body</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.predictions.map((p) => (
-            <tr key={p.matchId}>
-              <td>{p.matchNumber}</td>
-              <td>
-                <span className="cc-full">{p.homeTeam}</span>
-                <span className="cc-short">{teamCode(p.homeTeam)}</span>
-                {' – '}
-                <span className="cc-full">{p.awayTeam}</span>
-                <span className="cc-short">{teamCode(p.awayTeam)}</span>
-              </td>
-              <td>{p.homeScore}:{p.awayScore}</td>
-              <td>{p.result ? `${p.result.home}:${p.result.away}` : '—'}</td>
-              <td className="num">{p.points != null ? p.points : '—'}</td>
-              <td>
-                <button className="btn-sm warn" onClick={() => deletePrediction(p)}>
-                  Zmazať
-                </button>
-              </td>
-            </tr>
-          ))}
-          {data.predictions.length === 0 && (
-            <tr><td colSpan="6" className="muted">žiadne tipy</td></tr>
-          )}
-        </tbody>
-      </table>
+      <div className="tabs detail-tabs">
+        <button className={tab === 'tipy' ? 'active' : ''} onClick={() => setTab('tipy')}>
+          Tipy ({data.predictions.length})
+        </button>
+        <button className={tab === 'skupiny' ? 'active' : ''} onClick={() => setTab('skupiny')}>
+          Skupiny
+        </button>
+        <button className={tab === 'playoff' ? 'active' : ''} onClick={() => setTab('playoff')}>
+          PlayOff
+        </button>
+        <ChampionLabel id={id} />
+      </div>
 
-      <PlayoffSummary id={id} />
+      {tab === 'tipy' && (
+        <table className="table small">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Zápas</th>
+              <th>Tip</th>
+              <th>Výsledok</th>
+              <th className="num">Body</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.predictions.map((p) => (
+              <tr key={p.matchId}>
+                <td>{p.matchNumber}</td>
+                <td>
+                  <span className="cc-full">{p.homeTeam}</span>
+                  <span className="cc-short">{teamCode(p.homeTeam)}</span>
+                  {' – '}
+                  <span className="cc-full">{p.awayTeam}</span>
+                  <span className="cc-short">{teamCode(p.awayTeam)}</span>
+                </td>
+                <td>{p.homeScore}:{p.awayScore}</td>
+                <td>{p.result ? `${p.result.home}:${p.result.away}` : '—'}</td>
+                <td className="num">{p.points != null ? p.points : '—'}</td>
+                <td>
+                  <button className="btn-sm warn" onClick={() => deletePrediction(p)}>
+                    Zmazať
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {data.predictions.length === 0 && (
+              <tr><td colSpan="6" className="muted">žiadne tipy</td></tr>
+            )}
+          </tbody>
+        </table>
+      )}
+
+      {tab === 'skupiny' && <GroupsSummary id={id} />}
+      {tab === 'playoff' && <PlayoffSummary id={id} />}
     </div>
   );
 }
@@ -177,9 +268,6 @@ function UsersTab() {
           <thead>
             <tr>
               <th>Prezývka</th>
-              <th className="num">Body</th>
-              <th className="num">Tipov</th>
-              <th>Šampión</th>
               <th>Stav</th>
             </tr>
           </thead>
@@ -194,13 +282,10 @@ function UsersTab() {
                   {u.nickname || <span className="muted">{u.email}</span>}
                   {u.isAdmin && <span className="tag admin">admin</span>}
                 </td>
-                <td className="num">{u.totalPoints}</td>
-                <td className="num">{u.predictions}</td>
-                <td><TeamTag team={u.champion} /></td>
                 <td>
-                  {u.blocked && <span className="tag danger">blok</span>}
-                  {u.hiddenFromLeaderboard && <span className="tag warn">skrytý</span>}
-                  {!u.blocked && !u.hiddenFromLeaderboard && <span className="muted">ok</span>}
+                  {u.blocked && <span className="tag danger">Zablokovaný</span>}
+                  {u.hiddenFromLeaderboard && <span className="tag warn">Skrytý</span>}
+                  {!u.blocked && !u.hiddenFromLeaderboard && <span className="muted">OK</span>}
                 </td>
               </tr>
             ))}

@@ -71,6 +71,7 @@ export const api = {
     users: () => req('/admin/users'),
     user: (id) => req(`/admin/users/${id}`),
     playoff: (id) => req(`/admin/users/${id}/playoff`),
+    groups: (id) => req(`/admin/users/${id}/groups`),
     toggleHide: (id) => req(`/admin/users/${id}/toggle-hide`, { method: 'POST' }),
     toggleBlock: (id) => req(`/admin/users/${id}/toggle-block`, { method: 'POST' }),
     matches: () => req('/admin/matches'),
