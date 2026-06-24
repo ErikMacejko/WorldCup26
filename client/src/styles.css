@@ -184,13 +184,12 @@ h2 { margin-top: 0; }
 }
 
 .score-box { min-width: 110px; display: flex; justify-content: center; }
-.score-edit { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; }
 .score-inputs { display: flex; align-items: center; gap: 0.35rem; }
 .score-inputs input {
   width: 42px; text-align: center; padding: 0.4rem; border-radius: 8px;
   border: 1px solid var(--border); background: var(--panel-2); color: var(--text); font-size: 1rem;
 }
-.tip-deadline { text-align: center; white-space: nowrap; }
+.tip-deadline { text-align: center; margin-top: -0.2rem; margin-bottom: 0.4rem; }
 .locked-score .my-tip { font-size: 1.2rem; font-weight: 700; }
 
 .match-footer { margin-top: 0.4rem; }
