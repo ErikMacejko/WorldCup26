@@ -137,24 +137,29 @@ function MatchCard({ match, myPred, onSaved }) {
 
         <div className="score-box">
           {editable ? (
-            <div className="score-inputs">
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]{1,2}"
-                maxLength={2}
-                value={home}
-                onChange={handleScoreChange(setHome)}
-              />
-              <span>:</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]{1,2}"
-                maxLength={2}
-                value={away}
-                onChange={handleScoreChange(setAway)}
-              />
+            <div className="score-edit">
+              <div className="score-inputs">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{1,2}"
+                  maxLength={2}
+                  value={home}
+                  onChange={handleScoreChange(setHome)}
+                />
+                <span>:</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{1,2}"
+                  maxLength={2}
+                  value={away}
+                  onChange={handleScoreChange(setAway)}
+                />
+              </div>
+              <div className="tip-deadline muted small">
+                Na tento zápas môžeš tipovať do {fmtDateTime(match.lockAt)}
+              </div>
             </div>
           ) : (
             <div className="locked-score">

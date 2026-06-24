@@ -18,7 +18,13 @@ function Rules() {
             <li><strong>1 bod</strong> – trafený počet gólov jedného z tímov</li>
           </ul>
           <p>Body za víťaza a za počet gólov sa sčítavajú (max. 2 body, ak nejde o presný výsledok).</p>
-          <p className="rules-warning">Tip môžeš meniť len do <strong>30 minút pred výkopom</strong> zápasu, potom sa uzamkne a zobrazia sa tipy ostatných hráčov.</p>
+          <p>Pri rovnosti celkového počtu bodov v poradí rozhoduje postupne:</p>
+          <ul>
+            <li>kto trafil <strong>šampióna</strong>,</li>
+            <li>pri zhode šampióna kto má viac bodov za <strong>PlayOff</strong>,</li>
+            <li>pri zhode bodov za PlayOff kto má viac bodov za <strong>poradie v skupinách</strong>,</li>
+            <li>a pri zhode aj v tomto kto má viac <strong>presne uhádnutých výsledkov</strong> zápasov.</li>
+          </ul>
         </div>
       )}
     </div>
@@ -48,12 +54,12 @@ export default function Leaderboard() {
           <tr>
             <th>#</th>
             <th>Hráč</th>
-            <th className="num">Zápasy</th>
-            <th className="num">Skupiny</th>
-            <th className="num">Playoff</th>
-            <th className="num">Celkom</th>
-            <th className="num">Presné</th>
-            <th className="num">Tipov</th>
+            <th className="num">PT</th>
+            <th className="num">BZ</th>
+            <th className="num">BS</th>
+            <th className="num">BPO</th>
+            <th className="num">PV</th>
+            <th className="num">Body</th>
           </tr>
         </thead>
         <tbody>
@@ -64,12 +70,12 @@ export default function Leaderboard() {
             >
               <td>{r.rank}</td>
               <td>{r.nickname}</td>
+              <td className="num">{r.scored}</td>
               <td className="num">{r.matchPoints}</td>
               <td className="num">{r.groupPoints}</td>
               <td className="num">{r.playoffPoints}</td>
-              <td className="num strong">{r.totalPoints}</td>
               <td className="num">{r.exact}</td>
-              <td className="num">{r.scored}</td>
+              <td className="num strong">{r.totalPoints}</td>
             </tr>
           ))}
           {rows.length === 0 && (
@@ -81,6 +87,14 @@ export default function Leaderboard() {
           )}
         </tbody>
       </table>
+      <ul className="muted small table-legend">
+        <li><strong>PT</strong> – počet tipov</li>
+        <li><strong>BZ</strong> – body za zápasy</li>
+        <li><strong>BS</strong> – body za skupiny</li>
+        <li><strong>BPO</strong> – body za playoff</li>
+        <li><strong>PV</strong> – presné výsledky</li>
+        <li><strong>Body</strong> – body celkovo</li>
+      </ul>
     </div>
   );
 }

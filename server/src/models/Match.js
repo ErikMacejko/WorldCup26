@@ -54,6 +54,7 @@ matchSchema.methods.toClient = function (now = new Date(), userId = null) {
     homeTeam: this.homeTeam,
     awayTeam: this.awayTeam,
     kickoff: this.kickoff,
+    lockAt: new Date(this.kickoff.getTime() - LOCK_MS),
     venue: this.venue,
     city: this.city,
     status: this.status,
