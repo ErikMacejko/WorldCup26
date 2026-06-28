@@ -13,13 +13,12 @@ function GroupSummaryCard({ letter, order, advances }) {
       <div className="group-rank-list">
         {order.map((team, i) => (
           <div key={team} className="group-rank-row">
-            <span className="rank-num">{i + 1}.</span>
+            <span className={`rank-badge ${i < 2 ? 'rank-adv-top' : i === 2 && advances ? 'rank-adv-third' : ''}`}>{i + 1}</span>
             <span className="flag">{flag(team)}</span>
             <span className="team-name">
               <span className="cc-full">{team}</span>
               <span className="cc-short">{teamCode(team)}</span>
             </span>
-            {i === 2 && advances && <span className="tag warn">postupuje</span>}
           </div>
         ))}
       </div>

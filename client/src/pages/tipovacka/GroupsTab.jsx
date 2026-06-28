@@ -11,7 +11,7 @@ function PtsBadge({ pts, max }) {
   return <span className={`pts-tag ${cls}`}>+{pts} b</span>;
 }
 
-function GroupCard({ letter, order, onMove, locked, pts }) {
+function GroupCard({ letter, order, thirdAdvances, onMove, locked, pts }) {
   return (
     <div className="group-card">
       <div className="group-card-header">
@@ -21,7 +21,7 @@ function GroupCard({ letter, order, onMove, locked, pts }) {
       <div className="group-rank-list">
         {order.map((team, i) => (
           <div key={team} className="group-rank-row">
-            <span className="rank-num">{i + 1}.</span>
+            <span className={`rank-badge ${i < 2 ? 'rank-adv-top' : i === 2 && thirdAdvances ? 'rank-adv-third' : ''}`}>{i + 1}</span>
             <span className="flag">{flag(team)}</span>
             <span className="team-name">
               <span className="cc-full">{team}</span>
@@ -161,6 +161,7 @@ export default function GroupsTab() {
             key={letter}
             letter={letter}
             order={groups[letter].order}
+            thirdAdvances={groups[letter].thirdAdvances}
             onMove={(idx, dir) => move(letter, idx, dir)}
             locked={locked}
             pts={perGroup?.[letter]}

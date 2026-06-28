@@ -13,6 +13,8 @@ import playoffRoutes from './routes/playoff.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import resultsRoutes from './routes/results.js';
 import adminRoutes from './routes/admin.js';
+import chatRoutes from './routes/chat.js';
+import gifRoutes from './routes/gif.js';
 import { syncResults } from './lib/sync.js';
 
 const SYNC_INTERVAL_MS = 10 * 60 * 1000;
@@ -22,7 +24,7 @@ async function main() {
 
   const app = express();
   app.set('trust proxy', 1);
-  app.use(express.json());
+  app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
   app.use(
     cors({
@@ -43,6 +45,8 @@ async function main() {
   app.use('/api/leaderboard', leaderboardRoutes);
   app.use('/api/results', resultsRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/chat', chatRoutes);
+  app.use('/api/gif', gifRoutes);
 
   // Centralised error handler.
   app.use((err, req, res, next) => {

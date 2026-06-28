@@ -25,6 +25,15 @@ router.get('/mine', requireAuth, async (req, res) => {
   res.json(await getPlayoffView(req.user._id));
 });
 
+// Any logged-in user can view another player's playoff bracket, but only after
+// all 12 groups have finished (completedGroups.length >= 12).
+router.get('/player/:userId', requireAuth, async (req, res) => {
+  const groupResult = await GroupResult.getSingleton();
+  const groupsDone = groupResult.completedGroups.length >= 12;
+  if (!groupsDone) return res.status(403).json({ error: 'groups_not_finished' });
+  res.json(await getPlayoffView(req.params.userId));
+});
+
 // Save the full round-by-round bracket picks.
 router.put('/mine', requireAuth, requireNickname, async (req, res) => {
   const groupResult = await GroupResult.getSingleton();

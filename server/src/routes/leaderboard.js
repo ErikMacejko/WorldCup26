@@ -44,12 +44,13 @@ router.get('/', requireAuth, async (req, res) => {
       const groupPoints = groupByUser.get(u._id.toString()) || 0;
       const playoffPoints = playoffByUser.get(u._id.toString()) || 0;
       return {
+        userId: u._id.toString(),
         nickname: u.nickname,
         exact: m?.exact || 0,
         matchPoints,
         groupPoints,
         playoffPoints,
-        scored: m?.scored || 0, 
+        scored: m?.scored || 0,
         totalPoints: matchPoints + groupPoints + playoffPoints
       };
     })

@@ -25,6 +25,7 @@ services:
       ADMIN_EMAILS: ${ADMIN_EMAILS}
       LOCK_MINUTES: ${LOCK_MINUTES:-30}
       FOOTBALL_DATA_TOKEN: ${FOOTBALL_DATA_TOKEN}
+      GIPHY_API_KEY: ${GIPHY_API_KEY:-}
       NODE_ENV: production
     # No public port — the frontend's nginx proxies /api to it.
     expose:

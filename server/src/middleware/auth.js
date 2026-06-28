@@ -34,7 +34,8 @@ export async function requireAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization || '';
     const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    const token = bearer || req.cookies?.[COOKIE_NAME];
+    // req.query.token is the fallback for EventSource (SSE) which cannot send headers.
+    const token = bearer || req.cookies?.[COOKIE_NAME] || req.query?.token;
     if (!token) return res.status(401).json({ error: 'not_authenticated' });
 
     const payload = jwt.verify(token, config.jwtSecret);

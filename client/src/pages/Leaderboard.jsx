@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
+import PlayerModal from '../components/PlayerModal.jsx';
 
 function Rules() {
   const [open, setOpen] = useState(false);
@@ -35,6 +36,7 @@ export default function Leaderboard() {
   const { user } = useAuth();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
 
   useEffect(() => {
     api.leaderboard().then((r) => {
@@ -49,11 +51,13 @@ export default function Leaderboard() {
     <div className="page">
       <h2>Poradie</h2>
       <Rules />
-      <table className="table">
+      {selected && <PlayerModal player={selected} onClose={() => setSelected(null)} />}
+      <div className="table-wrap">
+      <table className="table leaderboard-table">
         <thead>
           <tr>
             <th>#</th>
-            <th>Hráč</th>
+            <th className="sticky-col">Hráč</th>
             <th className="num">PT</th>
             <th className="num">BZ</th>
             <th className="num">BS</th>
@@ -69,7 +73,11 @@ export default function Leaderboard() {
               className={user?.nickname === r.nickname ? 'me' : ''}
             >
               <td>{r.rank}</td>
-              <td>{r.nickname}</td>
+              <td className="sticky-col">
+                <button className="lb-player-btn" onClick={() => setSelected(r)}>
+                  {r.nickname}
+                </button>
+              </td>
               <td className="num">{r.scored}</td>
               <td className="num">{r.matchPoints}</td>
               <td className="num">{r.groupPoints}</td>
@@ -87,6 +95,7 @@ export default function Leaderboard() {
           )}
         </tbody>
       </table>
+      </div>
       <ul className="muted small table-legend">
         <li><strong>PT</strong> – počet tipov</li>
         <li><strong>BZ</strong> – body za zápasy</li>

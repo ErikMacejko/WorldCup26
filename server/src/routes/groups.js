@@ -29,6 +29,13 @@ router.get('/mine', requireAuth, async (req, res) => {
   });
 });
 
+// Any logged-in user can view another player's group picks (read-only).
+router.get('/player/:userId', requireAuth, async (req, res) => {
+  const pred = await GroupPrediction.findOne({ user: req.params.userId });
+  if (!pred) return res.json({ groups: {}, points: null, perGroup: null, thirdsBonus: null });
+  res.json({ groups: pred.groups, points: pred.points, perGroup: pred.perGroup, thirdsBonus: pred.thirdsBonus });
+});
+
 function isValidOrder(order, letter) {
   if (!Array.isArray(order) || order.length !== 4) return false;
   const a = [...order].sort();

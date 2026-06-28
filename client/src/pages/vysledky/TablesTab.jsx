@@ -4,7 +4,13 @@ import { flag, teamCode, fmtDateTime } from '../../lib/format.js';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 
-function GroupTable({ letter, rows }) {
+function rankClass(i, team, r32Teams) {
+  if (i === 0 || i === 1) return 'rank-adv-top';
+  if (i === 2 && r32Teams?.has(team)) return 'rank-adv-third';
+  return '';
+}
+
+function GroupTable({ letter, rows, r32Teams }) {
   return (
     <div className="group-card">
       <div className="group-card-header">
@@ -31,7 +37,7 @@ function GroupTable({ letter, rows }) {
           )}
           {rows.map((row, i) => (
             <tr key={row.team} className="results-row">
-              <td className="rank-num">{i + 1}.</td>
+              <td className="rank-num"><span className={`rank-badge ${rankClass(i, row.team, r32Teams)}`}>{i + 1}</span></td>
               <td className="col-team">
                 <span className="flag">{flag(row.team)}</span>
                 <span className="team-name">
@@ -55,13 +61,15 @@ function GroupTable({ letter, rows }) {
 
 export default function TablesTab() {
   const [groups, setGroups] = useState(null);
+  const [r32Teams, setR32Teams] = useState(null);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.results.tables().then((res) => {
-      setGroups(res.groups || {});
-      setLastSyncAt(res.lastSyncAt);
+    Promise.all([api.results.tables(), api.results.playoff()]).then(([tablesRes, playoffRes]) => {
+      setGroups(tablesRes.groups || {});
+      setLastSyncAt(tablesRes.lastSyncAt);
+      setR32Teams(new Set((playoffRes.r32?.pairs || []).flat().filter(Boolean)));
       setLoading(false);
     });
   }, []);
@@ -76,7 +84,7 @@ export default function TablesTab() {
       </p>
       <div className="results-grid">
         {LETTERS.map((letter) => (
-          <GroupTable key={letter} letter={letter} rows={groups?.[letter] || []} />
+          <GroupTable key={letter} letter={letter} rows={groups?.[letter] || []} r32Teams={r32Teams} />
         ))}
       </div>
     </div>

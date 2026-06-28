@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from './auth.jsx';
 import Login from './pages/Login.jsx';
@@ -8,8 +8,9 @@ import Vysledky from './pages/Vysledky.jsx';
 import MyTips from './pages/MyTips.jsx';
 import Leaderboard from './pages/Leaderboard.jsx';
 import Admin from './pages/Admin.jsx';
+import Chat from './components/Chat.jsx';
 
-function Nav() {
+const Nav = forwardRef(function Nav(_, ref) {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const loc = useLocation();
@@ -20,7 +21,7 @@ function Nav() {
 
   if (!user) return null;
   return (
-    <header className="nav">
+    <header className="nav" ref={ref}>
       <div className="nav-brand">
         <span className="brand-mark">26</span>
         <span className="brand-text">MS 2026 Tipovačka</span>
@@ -46,7 +47,7 @@ function Nav() {
       </div>
     </header>
   );
-}
+});
 
 function Protected({ children, adminOnly }) {
   const { user, loading } = useAuth();
@@ -62,9 +63,32 @@ function Protected({ children, adminOnly }) {
 
 export default function App() {
   const { user, loading } = useAuth();
+  const loc = useLocation();
+  const isAdmin = loc.pathname.startsWith('/admin');
+  const [chatOpen, setChatOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const navRef = useRef(null);
+
+  // Keep --nav-h CSS variable in sync with actual navbar height so the mobile
+  // chat overlay starts exactly below the navbar (even when nav wraps).
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const update = () =>
+      document.documentElement.style.setProperty('--nav-h', `${nav.offsetHeight}px`);
+    update();
+    const obs = new ResizeObserver(update);
+    obs.observe(nav);
+    return () => obs.disconnect();
+  }, []);
+
+  const openChat = () => { setChatOpen(true); setUnread(0); };
+  const closeChat = () => setChatOpen(false);
+  const handleNewMsg = () => { if (!chatOpen) setUnread((n) => n + 1); };
+
   return (
     <div className="app">
-      <Nav />
+      <Nav ref={navRef} />
       <main className="content">
         <Routes>
           <Route
@@ -123,9 +147,27 @@ export default function App() {
         </Routes>
       </main>
       <footer className="footer muted">
-        Bodovanie: presný výsledok 3 b · víťaz zápasu 1 b · trafený počet gólov
-        jedného tímu 1 b
+        Bodovanie: presný výsledok 3 b · víťaz zápasu 1 b · trafený počet gólov jedného tímu 1 b
       </footer>
+
+      {/* FAB + fixed chat panel — on all screen sizes, hidden only on admin */}
+      {user && !isAdmin && (
+        <>
+          {!chatOpen && (
+            <button className="chat-fab" onClick={openChat} aria-label="Chat">
+              💬
+              {unread > 0 && (
+                <span className="chat-fab-badge">{unread > 9 ? '9+' : unread}</span>
+              )}
+            </button>
+          )}
+          {chatOpen && (
+            <div className="chat-overlay">
+              <Chat onClose={closeChat} onNewMessage={handleNewMsg} />
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

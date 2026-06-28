@@ -61,6 +61,18 @@ export const api = {
   myPlayoffPrediction: () => req('/playoff/mine'),
   savePlayoffPrediction: (picks) =>
     req('/playoff/mine', { method: 'PUT', body: JSON.stringify(picks) }),
+  groupsOf: (userId) => req(`/groups/player/${userId}`),
+  playoffOf: (userId) => req(`/playoff/player/${userId}`),
+
+  chat: {
+    messages: () => req('/chat/messages'),
+    send: (text) => req('/chat/messages', { method: 'POST', body: JSON.stringify({ text }) }),
+    sendImage: (imageData) => req('/chat/messages', { method: 'POST', body: JSON.stringify({ imageData }) }),
+  },
+
+  gif: {
+    search: (q) => req(`/gif/search?q=${encodeURIComponent(q || '')}`),
+  },
 
   results: {
     tables: () => req('/results/tables'),
