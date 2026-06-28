@@ -95,17 +95,17 @@ async function syncGroupMatches(apiMatches) {
   return ourMatches;
 }
 
-// Knockout team assignments + results (matchNumber 73-104): each API stage's
-// matches, sorted by id ascending, are assigned in order to our matchNumbers
-// for that stage. computeRealDepths only depends on each match's `stage`,
-// not its exact matchNumber, so scoring correctness doesn't depend on this
-// ordering being perfectly aligned with FIFA's bracket-slot numbers - only
-// the cosmetic bracket-tree layout on the Vysledky MS -> PlayOff tab does,
-// and that tab reads from these same Match docs.
+// Knockout team assignments + results (matchNumber 73-104): sort both the API
+// matches and our Match docs by date, then pair them by index. Sorting by API
+// id (the old approach) doesn't align with chronological bracket slot order.
+// Kickoffs are always updated from the API — seed dates were placeholders.
 async function syncKnockout(apiMatches) {
   for (const { api, start, end } of KNOCKOUT_STAGES) {
-    const stageMatches = apiMatches.filter((m) => m.stage === api).sort((a, b) => a.id - b.id);
-    const ourMatches = await Match.find({ matchNumber: { $gte: start, $lte: end } }).sort({ matchNumber: 1 });
+    const stageMatches = apiMatches
+      .filter((m) => m.stage === api)
+      .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
+    // Sort by kickoff first (updated each run from API), matchNumber as tiebreaker.
+    const ourMatches = await Match.find({ matchNumber: { $gte: start, $lte: end } }).sort({ kickoff: 1, matchNumber: 1 });
 
     for (let i = 0; i < ourMatches.length; i++) {
       const am = stageMatches[i];
@@ -122,7 +122,7 @@ async function syncKnockout(apiMatches) {
         match.awayTeam = am.awayTeam;
         changed = true;
       }
-      if (am.homeTeam && am.awayTeam && am.utcDate) {
+      if (am.utcDate) {
         const newKickoff = new Date(am.utcDate);
         if (match.kickoff.getTime() !== newKickoff.getTime()) {
           match.kickoff = newKickoff;

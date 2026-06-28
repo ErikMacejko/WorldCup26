@@ -18,8 +18,8 @@ router.get('/tables', requireAuth, async (req, res) => {
 });
 
 function pairFromMatch(m) {
-  if (!m || m.homeTeam === 'TBD' || m.awayTeam === 'TBD') return null;
-  return [m.homeTeam, m.awayTeam];
+  if (!m || (m.homeTeam === 'TBD' && m.awayTeam === 'TBD')) return null;
+  return [m.homeTeam === 'TBD' ? null : m.homeTeam, m.awayTeam === 'TBD' ? null : m.awayTeam];
 }
 
 function scoresFromMatch(m) {
