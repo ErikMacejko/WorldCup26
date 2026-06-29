@@ -95,54 +95,110 @@ async function syncGroupMatches(apiMatches) {
   return ourMatches;
 }
 
-// Knockout team assignments + results (matchNumber 73-104): sort both the API
-// matches and our Match docs by date, then pair them by index. Sorting by API
-// id (the old approach) doesn't align with chronological bracket slot order.
-// Kickoffs are always updated from the API — seed dates were placeholders.
+// For R16+ rounds: map each API match to its correct bracket slot by looking
+// up one of its teams in the prev-round slot map (team → prev-round index).
+// Each R16 slot i receives the two winners from R32 slots 2i and 2i+1, so
+// floor(prevSlot/2) gives the current-round slot. Matches with no known team
+// (still TBD) fall back to date order for the remaining empty slots.
+function orderByBracketSlot(stageApiMatches, prevTeamSlotMap, count) {
+  const result = new Array(count).fill(null);
+  const unplaced = [];
+
+  for (const am of stageApiMatches) {
+    const home = am.homeTeam || null;
+    const away = am.awayTeam || null;
+    const prevSlot = prevTeamSlotMap.get(home) ?? prevTeamSlotMap.get(away);
+
+    if (prevSlot != null) {
+      const slot = Math.floor(prevSlot / 2);
+      if (!result[slot]) result[slot] = am;
+    } else {
+      unplaced.push(am);
+    }
+  }
+
+  unplaced.sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
+  let ui = 0;
+  for (let i = 0; i < count; i++) {
+    if (!result[i] && ui < unplaced.length) result[i] = unplaced[ui++];
+  }
+  return result;
+}
+
+// Knockout team assignments + results (matchNumber 73-104).
+// R32: sort both API and our matches by date (seed dates were placeholders,
+//   API dates get written back each run).
+// R16+: derive the bracket slot from which R32 slot each team came from —
+//   avoids the wrong slot assignment that date-only sorting causes when the
+//   first-scheduled R16 match is not bracket slot 0.
 async function syncKnockout(apiMatches) {
+  let prevOrderedApiMatches = null; // null → R32 (no previous round)
+
   for (const { api, start, end } of KNOCKOUT_STAGES) {
-    const stageMatches = apiMatches
-      .filter((m) => m.stage === api)
-      .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
-    // Sort by kickoff first (updated each run from API), matchNumber as tiebreaker.
-    const ourMatches = await Match.find({ matchNumber: { $gte: start, $lte: end } }).sort({ kickoff: 1, matchNumber: 1 });
+    const count = end - start + 1;
+    const stageApiMatches = apiMatches.filter((m) => m.stage === api);
+
+    let orderedApiMatches;
+    let matchSort;
+
+    if (prevOrderedApiMatches === null) {
+      // R32: date order (same as before)
+      orderedApiMatches = [...stageApiMatches].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
+      matchSort = { kickoff: 1, matchNumber: 1 };
+    } else {
+      // R16+: bracket-position order derived from previous round's teams
+      const prevTeamSlotMap = new Map();
+      for (let i = 0; i < prevOrderedApiMatches.length; i++) {
+        const m = prevOrderedApiMatches[i];
+        if (m.homeTeam) prevTeamSlotMap.set(m.homeTeam, i);
+        if (m.awayTeam) prevTeamSlotMap.set(m.awayTeam, i);
+      }
+      orderedApiMatches = orderByBracketSlot(stageApiMatches, prevTeamSlotMap, count);
+      matchSort = { matchNumber: 1 };
+    }
+
+    const ourMatches = await Match.find({ matchNumber: { $gte: start, $lte: end } }).sort(matchSort);
 
     for (let i = 0; i < ourMatches.length; i++) {
-      const am = stageMatches[i];
+      const am = orderedApiMatches[i];
       const match = ourMatches[i];
-      if (!am) continue;
 
       let changed = false;
 
-      if (am.homeTeam && match.homeTeam !== am.homeTeam) {
-        match.homeTeam = am.homeTeam;
-        changed = true;
-      }
-      if (am.awayTeam && match.awayTeam !== am.awayTeam) {
-        match.awayTeam = am.awayTeam;
-        changed = true;
-      }
-      if (am.utcDate) {
-        const newKickoff = new Date(am.utcDate);
-        if (match.kickoff.getTime() !== newKickoff.getTime()) {
-          match.kickoff = newKickoff;
+      if (am) {
+        if (am.homeTeam && match.homeTeam !== am.homeTeam) {
+          match.homeTeam = am.homeTeam;
           changed = true;
         }
-      }
-
-      if (am.status === 'FINISHED') {
-        const result = resultFromScore(am.score);
-        if (result) {
-          const resultChanged =
-            match.result?.home !== result.home ||
-            match.result?.away !== result.away ||
-            match.result?.penaltyWinner !== result.penaltyWinner;
-          if (resultChanged || match.status !== 'finished') {
-            match.result = result;
-            match.status = 'finished';
+        if (am.awayTeam && match.awayTeam !== am.awayTeam) {
+          match.awayTeam = am.awayTeam;
+          changed = true;
+        }
+        if (am.utcDate) {
+          const newKickoff = new Date(am.utcDate);
+          if (match.kickoff.getTime() !== newKickoff.getTime()) {
+            match.kickoff = newKickoff;
             changed = true;
           }
         }
+        if (am.status === 'FINISHED') {
+          const result = resultFromScore(am.score);
+          if (result) {
+            const resultChanged =
+              match.result?.home !== result.home ||
+              match.result?.away !== result.away ||
+              match.result?.penaltyWinner !== result.penaltyWinner;
+            if (resultChanged || match.status !== 'finished') {
+              match.result = result;
+              match.status = 'finished';
+              changed = true;
+            }
+          }
+        }
+      } else if (prevOrderedApiMatches !== null) {
+        // R16+ slot with no API match yet: reset incorrectly-assigned teams to TBD
+        if (match.homeTeam !== 'TBD') { match.homeTeam = 'TBD'; changed = true; }
+        if (match.awayTeam !== 'TBD') { match.awayTeam = 'TBD'; changed = true; }
       }
 
       if (changed) {
@@ -150,6 +206,8 @@ async function syncKnockout(apiMatches) {
         if (match.status === 'finished') await rescoreMatch(match);
       }
     }
+
+    prevOrderedApiMatches = orderedApiMatches;
   }
 }
 
