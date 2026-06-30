@@ -125,15 +125,23 @@ function orderByBracketSlot(stageApiMatches, prevTeamSlotMap, count) {
   return result;
 }
 
+// matchNumber ranges of the previous knockout round, used to build the
+// team→slot map for R16+ bracket-slot ordering.
+const PREV_ROUND = {
+  LAST_16:       { start: 73, end: 88 },
+  QUARTER_FINALS:{ start: 89, end: 96 },
+  SEMI_FINALS:   { start: 97, end: 100 },
+};
+
 // Knockout team assignments + results (matchNumber 73-104).
 // R32: sort both API and our matches by date (seed dates were placeholders,
 //   API dates get written back each run).
-// R16+: derive the bracket slot from which R32 slot each team came from —
-//   avoids the wrong slot assignment that date-only sorting causes when the
-//   first-scheduled R16 match is not bracket slot 0.
+// R16/QF/SF: derive the correct bracket slot from our own DB records of the
+//   previous round (sorted by matchNumber = visual display order). This
+//   correctly maps each team to floor(prevMatchIndex/2) regardless of what
+//   date the API scheduled their next match on.
+// Third-place/Final: only one match each, date sort is fine.
 async function syncKnockout(apiMatches) {
-  let prevOrderedApiMatches = null; // null → R32 (no previous round)
-
   for (const { api, start, end } of KNOCKOUT_STAGES) {
     const count = end - start + 1;
     const stageApiMatches = apiMatches.filter((m) => m.stage === api);
@@ -141,18 +149,26 @@ async function syncKnockout(apiMatches) {
     let orderedApiMatches;
     let matchSort;
 
-    if (prevOrderedApiMatches === null) {
-      // R32: date order (same as before)
+    const prevRange = PREV_ROUND[api];
+    if (!prevRange) {
+      // R32, THIRD_PLACE, FINAL: date order
       orderedApiMatches = [...stageApiMatches].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
       matchSort = { kickoff: 1, matchNumber: 1 };
     } else {
-      // R16+: bracket-position order derived from previous round's teams
+      // R16/QF/SF: look up each team in our DB records for the previous
+      // round (matchNumber order = visual bracket order) to find the correct
+      // current-round slot.
+      const prevDbMatches = await Match.find({
+        matchNumber: { $gte: prevRange.start, $lte: prevRange.end },
+      }).sort({ matchNumber: 1 });
+
       const prevTeamSlotMap = new Map();
-      for (let i = 0; i < prevOrderedApiMatches.length; i++) {
-        const m = prevOrderedApiMatches[i];
-        if (m.homeTeam) prevTeamSlotMap.set(m.homeTeam, i);
-        if (m.awayTeam) prevTeamSlotMap.set(m.awayTeam, i);
+      for (let i = 0; i < prevDbMatches.length; i++) {
+        const m = prevDbMatches[i];
+        if (m.homeTeam && m.homeTeam !== 'TBD') prevTeamSlotMap.set(m.homeTeam, i);
+        if (m.awayTeam && m.awayTeam !== 'TBD') prevTeamSlotMap.set(m.awayTeam, i);
       }
+
       orderedApiMatches = orderByBracketSlot(stageApiMatches, prevTeamSlotMap, count);
       matchSort = { matchNumber: 1 };
     }
@@ -195,7 +211,7 @@ async function syncKnockout(apiMatches) {
             }
           }
         }
-      } else if (prevOrderedApiMatches !== null) {
+      } else if (prevRange) {
         // R16+ slot with no API match yet: reset incorrectly-assigned teams to TBD
         if (match.homeTeam !== 'TBD') { match.homeTeam = 'TBD'; changed = true; }
         if (match.awayTeam !== 'TBD') { match.awayTeam = 'TBD'; changed = true; }
@@ -206,8 +222,6 @@ async function syncKnockout(apiMatches) {
         if (match.status === 'finished') await rescoreMatch(match);
       }
     }
-
-    prevOrderedApiMatches = orderedApiMatches;
   }
 }
 
