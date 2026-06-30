@@ -23,12 +23,23 @@ const KNOCKOUT_STAGES = [
 ];
 
 function resultFromScore(score) {
-  const home = score?.fullTime?.home;
-  const away = score?.fullTime?.away;
-  if (home == null || away == null) return null;
+  const full = score?.fullTime;
+  if (!full || full.home == null || full.away == null) return null;
 
+  // Derive the 90-minute result by stripping extra-time and penalty-shootout
+  // goals. football-data.org v4 accumulates all goals into fullTime, so
+  // subtracting extraTime (ET-only goals) and penalties (shootout goals) gives
+  // the clean 90-min score — which is what players tip and what we score against.
+  const et = score.extraTime;
+  const pen = score.penalties;
+  const home = full.home - (et?.home || 0) - (pen?.home || 0);
+  const away = full.away - (et?.away || 0) - (pen?.away || 0);
+
+  // Store the knockout-round winner (set whenever the 90-min result is level
+  // and the match needed ET or penalties to decide). Used by winnerFromMatch
+  // to advance the correct team in the bracket even though we score on 90-min.
   let penaltyWinner = null;
-  if (home === away && score.duration === 'PENALTY_SHOOTOUT') {
+  if (home === away && score.duration !== 'REGULAR') {
     if (score.winner === 'HOME_TEAM') penaltyWinner = 'home';
     else if (score.winner === 'AWAY_TEAM') penaltyWinner = 'away';
   }
