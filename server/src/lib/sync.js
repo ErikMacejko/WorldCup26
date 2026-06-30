@@ -107,12 +107,10 @@ async function syncKnockout(apiMatches) {
   for (const { api, start, end } of KNOCKOUT_STAGES) {
     const stageApiMatches = apiMatches.filter((m) => m.stage === api);
 
-    const isR32 = api === 'LAST_32';
-    const ordered = isR32
-      ? [...stageApiMatches].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
-      : [...stageApiMatches].sort((a, b) => a.id - b.id);
-
-    const matchSort = isR32 ? { kickoff: 1, matchNumber: 1 } : { matchNumber: 1 };
+    // Sort API matches by id — football-data.org assigns IDs in bracket-position
+    // order for all knockout rounds, so this gives the correct slot mapping.
+    const ordered = [...stageApiMatches].sort((a, b) => a.id - b.id);
+    const matchSort = { matchNumber: 1 };
     const ourMatches = await Match.find({ matchNumber: { $gte: start, $lte: end } }).sort(matchSort);
 
     for (let i = 0; i < ourMatches.length; i++) {
