@@ -118,7 +118,7 @@ function ThirdPicker({ picker, disabled }) {
 
 // picker (R32 only): { [pairIndex 1]: { value, options, onChange } } for the
 // match's "best 3rd place" slot, if it's one of the 8 wildcard slots.
-function MatchCard({ pair, winner, disabled, onPick, scores, picker }) {
+function MatchCard({ pair, winner, disabled, onPick, scores, picker, extra }) {
   if (!pair) return <PlaceholderCard />;
   const incomplete = pair.some((team) => team == null);
   return (
@@ -144,6 +144,7 @@ function MatchCard({ pair, winner, disabled, onPick, scores, picker }) {
           />
         );
       })}
+      {extra && <div className="bt-extra">{extra}</div>}
     </div>
   );
 }
@@ -152,7 +153,7 @@ function MatchCard({ pair, winner, disabled, onPick, scores, picker }) {
 // matches grouped into pairs (`.bt-pair`) so each pair can grow/shrink
 // together with CSS, which is what keeps the connector lines aligned with
 // the midpoint of the two matches feeding the next round.
-export function TreeRound({ label, roundKey, pairs, winners, scores, count, locked, onPick, isFinal, isFirst, pickers }) {
+export function TreeRound({ label, roundKey, pairs, winners, scores, extras, count, locked, onPick, isFinal, isFirst, pickers }) {
   const roundClass = `bt-round ${isFirst ? 'bt-r32' : ''}`;
 
   if (isFinal) {
@@ -161,7 +162,7 @@ export function TreeRound({ label, roundKey, pairs, winners, scores, count, lock
       <div className={roundClass}>
         <h4>{label}</h4>
         <div className="bt-match-wrap">
-          <MatchCard pair={pair} winner={winners} disabled={locked} onPick={onPick} scores={scores ? scores[0] : null} />
+          <MatchCard pair={pair} winner={winners} disabled={locked} onPick={onPick} scores={scores ? scores[0] : null} extra={extras ? extras[0] : null} />
         </div>
       </div>
     );
@@ -169,6 +170,7 @@ export function TreeRound({ label, roundKey, pairs, winners, scores, count, lock
 
   const groups = pairs ? toPairs(pairs) : Array(count / 2).fill(null);
   const scoreGroups = scores ? toPairs(scores) : null;
+  const extraGroups = extras ? toPairs(extras) : null;
 
   return (
     <div className={roundClass}>
@@ -186,6 +188,7 @@ export function TreeRound({ label, roundKey, pairs, winners, scores, count, lock
                   disabled={locked}
                   onPick={onPick ? (team) => onPick(roundKey, i, team) : undefined}
                   scores={scoreGroups ? scoreGroups[gi]?.[j] : null}
+                  extra={extraGroups ? extraGroups[gi]?.[j] : null}
                   picker={pickers?.[i]}
                 />
               </div>
@@ -229,6 +232,7 @@ export default function BracketView({ rounds, locked, onPick, onPickChampion, ac
                       disabled={locked}
                       onPick={onPick ? (team) => onPick(key, i, team) : undefined}
                       scores={showScores ? scores?.[i] : null}
+                      extra={showScores ? extras?.[i] : null}
                       picker={thirdPickers?.[i]}
                     />
                   ))}
@@ -251,6 +255,7 @@ export default function BracketView({ rounds, locked, onPick, onPickChampion, ac
                 disabled={locked}
                 onPick={onPickChampion}
                 scores={showScores ? rounds.final.scores?.[0] : null}
+                extra={showScores ? rounds.final.extras?.[0] : null}
               />
             </div>
           )}
@@ -260,7 +265,7 @@ export default function BracketView({ rounds, locked, onPick, onPickChampion, ac
       {/* Desktop: full bracket tree, all rounds side by side */}
       <div className="bracket-tree">
         {ROUND_DEFS.map(({ key, label, tab }, idx) => {
-          const { pairs, winners, scores, thirdPickers } = rounds[key];
+          const { pairs, winners, scores, extras, thirdPickers } = rounds[key];
           const counts = { r32: 16, r16: 8, qf: 4, sf: 2 };
           return (
             <TreeRound
@@ -270,6 +275,7 @@ export default function BracketView({ rounds, locked, onPick, onPickChampion, ac
               pairs={pairs}
               winners={winners}
               scores={showScores ? scores : null}
+              extras={showScores ? extras : null}
               count={counts[key]}
               locked={locked}
               onPick={onPick}
@@ -283,6 +289,7 @@ export default function BracketView({ rounds, locked, onPick, onPickChampion, ac
           pairs={rounds.final.pairs}
           winners={rounds.final.winner}
           scores={showScores ? rounds.final.scores : null}
+          extras={showScores ? rounds.final.extras : null}
           count={1}
           locked={locked}
           onPick={onPickChampion}

@@ -26,10 +26,15 @@ const matchSchema = new mongoose.Schema(
     result: {
       home: { type: Number, default: null },
       away: { type: Number, default: null },
-      // Who advanced on penalties, only set when home === away in a
+      // Who advanced on penalties/ET, only set when home === away in a
       // knockout-stage match.
       penaltyWinner: { type: String, enum: ['home', 'away', null], default: null },
+      // Penalty-shootout goals (null for REGULAR/EXTRA_TIME matches).
+      penaltyHome: { type: Number, default: null },
+      penaltyAway: { type: Number, default: null },
     },
+    // How the match was decided: REGULAR, EXTRA_TIME, or PENALTY_SHOOTOUT.
+    matchDuration: { type: String, enum: ['REGULAR', 'EXTRA_TIME', 'PENALTY_SHOOTOUT', null], default: null },
     // Players an admin has granted a one-shot back-fill for this locked
     // match (see predictions.js). Each entry is consumed as soon as that
     // player submits a tip; the admin can grant it again from the Results tab.
@@ -64,8 +69,11 @@ matchSchema.methods.toClient = function (now = new Date(), userId = null) {
             home: this.result.home,
             away: this.result.away,
             penaltyWinner: this.result.penaltyWinner || null,
+            penaltyHome: this.result.penaltyHome ?? null,
+            penaltyAway: this.result.penaltyAway ?? null,
           }
         : null,
+    matchDuration: this.matchDuration || null,
     locked: this.isLocked(now),
     canBackfill: userId ? this.backfillFor.some((id) => id.equals(userId)) : false,
   };

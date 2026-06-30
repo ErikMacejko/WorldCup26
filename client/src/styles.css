@@ -395,6 +395,7 @@ h2 { margin-top: 0; }
 .locked-bottom { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .lock { color: var(--muted); }
 .result-badge { font-weight: 700; }
+.result-extra { font-size: 0.78rem; font-weight: 500; color: var(--muted); margin-left: 0.35rem; }
 .pts-tag { padding: 0.1rem 0.5rem; border-radius: 999px; font-weight: 700; font-size: 0.8rem; background: var(--panel-2); }
 .pts-tag.pts-3 { background: var(--gold); color: #2b1600; }
 .pts-tag.pts-2, .pts-tag.pts-1 { background: #2f6b3f; color: #fff; }
@@ -435,6 +436,7 @@ h2 { margin-top: 0; }
 .sched-match .sched-away { text-align: left; }
 .sched-match .flag { font-size: 1.2rem; }
 .vs { color: var(--muted); font-weight: 600; min-width: 1.6rem; text-align: center; }
+.sched-extra { font-size: 0.72rem; font-weight: 500; color: var(--muted); display: block; line-height: 1.1; }
 @media (max-width: 640px) {
   .sched-row { grid-template-columns: 48px 1fr; }
   .sched-stage, .sched-venue { display: none; }
@@ -617,6 +619,10 @@ h2 { margin-top: 0; }
 .bt-score {
   font-weight: 800; font-size: 1.05rem; min-width: 1.4rem;
   text-align: right; flex-shrink: 0;
+}
+.bt-extra {
+  font-size: 0.72rem; font-weight: 500; color: var(--muted);
+  text-align: center; padding-top: 0.1rem;
 }
 .playoff-points-summary { margin: 0.75rem 0; }
 .playoff-breakdown { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.4rem; font-size: 0.85rem; }

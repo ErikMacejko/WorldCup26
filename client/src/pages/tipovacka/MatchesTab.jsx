@@ -10,11 +10,21 @@ import {
   fmtTime,
 } from '../../lib/format.js';
 
-function ScoreBadge({ result }) {
+function matchExtra(match) {
+  if (!match?.matchDuration || !match.result) return null;
+  if (match.matchDuration === 'PENALTY_SHOOTOUT' && match.result.penaltyHome != null) {
+    return `pen. ${match.result.penaltyHome}:${match.result.penaltyAway}`;
+  }
+  if (match.matchDuration === 'EXTRA_TIME') return 'po pred.';
+  return null;
+}
+
+function ScoreBadge({ result, extra }) {
   if (!result) return null;
   return (
     <span className="result-badge">
       {result.home} : {result.away}
+      {extra && <span className="result-extra">{extra}</span>}
     </span>
   );
 }
@@ -189,7 +199,7 @@ function MatchCard({ match, myPred, onSaved }) {
           <div className="save-block">
             {match.result && (
               <div className="muted small">
-                Zápas už skončil ({match.result.home}:{match.result.away}) — admin ti
+                Zápas už skončil ({match.result.home}:{match.result.away}{matchExtra(match) ? `, ${matchExtra(match)}` : ''}) — admin ti
                 dočasne odomkol tipovanie, tip sa ihneď ohodnotí podľa výsledku.
               </div>
             )}
@@ -210,7 +220,7 @@ function MatchCard({ match, myPred, onSaved }) {
           <div className="locked-info">
             {match.result && (
               <div className="locked-result">
-                Výsledok: <ScoreBadge result={match.result} />
+                Výsledok: <ScoreBadge result={match.result} extra={matchExtra(match)} />
               </div>
             )}
             <div className="locked-bottom">

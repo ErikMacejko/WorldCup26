@@ -2,6 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api.js';
 import { stageLabel, flag, teamCode, fmtTime, fmtDay } from '../../lib/format.js';
 
+function matchExtra(m) {
+  if (!m?.matchDuration || !m.result) return null;
+  if (m.matchDuration === 'PENALTY_SHOOTOUT' && m.result.penaltyHome != null) {
+    return `pen. ${m.result.penaltyHome}:${m.result.penaltyAway}`;
+  }
+  if (m.matchDuration === 'EXTRA_TIME') return 'po pred.';
+  return null;
+}
+
 export default function MatchesScheduleTab() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +53,7 @@ export default function MatchesScheduleTab() {
                   <span className="flag">{flag(m.homeTeam)}</span>
                   <span className="vs">
                     {m.result ? `${m.result.home}:${m.result.away}` : '–'}
+                    {matchExtra(m) && <span className="sched-extra">{matchExtra(m)}</span>}
                   </span>
                   <span className="flag">{flag(m.awayTeam)}</span>
                   <span className="team-name sched-away">

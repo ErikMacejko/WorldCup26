@@ -43,7 +43,14 @@ function resultFromScore(score) {
     if (score.winner === 'HOME_TEAM') penaltyWinner = 'home';
     else if (score.winner === 'AWAY_TEAM') penaltyWinner = 'away';
   }
-  return { home, away, penaltyWinner };
+  return {
+    home,
+    away,
+    penaltyWinner,
+    duration: score.duration || 'REGULAR',
+    penaltyHome: pen?.home ?? null,
+    penaltyAway: pen?.away ?? null,
+  };
 }
 
 // Group-stage matches (matchNumber 1-72): match API matches onto our Match
@@ -150,9 +157,19 @@ async function syncKnockout(apiMatches) {
           const resultChanged =
             match.result?.home !== result.home ||
             match.result?.away !== result.away ||
-            match.result?.penaltyWinner !== result.penaltyWinner;
+            match.result?.penaltyWinner !== result.penaltyWinner ||
+            match.result?.penaltyHome !== result.penaltyHome ||
+            match.result?.penaltyAway !== result.penaltyAway ||
+            match.matchDuration !== result.duration;
           if (resultChanged || match.status !== 'finished') {
-            match.result = result;
+            match.result = {
+              home: result.home,
+              away: result.away,
+              penaltyWinner: result.penaltyWinner,
+              penaltyHome: result.penaltyHome,
+              penaltyAway: result.penaltyAway,
+            };
+            match.matchDuration = result.duration;
             match.status = 'finished';
             changed = true;
           }

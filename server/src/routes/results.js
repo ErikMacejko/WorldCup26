@@ -27,6 +27,15 @@ function scoresFromMatch(m) {
   return [m.result.home, m.result.away];
 }
 
+function extrasFromMatch(m) {
+  if (!m || m.status !== 'finished') return null;
+  if (m.matchDuration === 'PENALTY_SHOOTOUT' && m.result?.penaltyHome != null) {
+    return `pen. ${m.result.penaltyHome}:${m.result.penaltyAway}`;
+  }
+  if (m.matchDuration === 'EXTRA_TIME') return 'po pred.';
+  return null;
+}
+
 function winnerFromMatch(m) {
   if (!m || m.result?.home == null || m.result?.away == null) return null;
   const { home, away, penaltyWinner } = m.result;
@@ -51,13 +60,15 @@ router.get('/playoff', requireAuth, async (req, res) => {
     const pairs = [];
     const winners = [];
     const scores = [];
+    const extras = [];
     for (let n = start; n <= end; n++) {
       const m = byNumber.get(n);
       pairs.push(pairFromMatch(m));
       winners.push(winnerFromMatch(m));
       scores.push(scoresFromMatch(m));
+      extras.push(extrasFromMatch(m));
     }
-    return { pairs, winners, scores };
+    return { pairs, winners, scores, extras };
   }
 
   const r32 = buildRound(73, 88);
@@ -71,7 +82,7 @@ router.get('/playoff', requireAuth, async (req, res) => {
     r16,
     qf,
     sf,
-    final: { pairs: final.pairs, winner: final.winners[0], scores: final.scores },
+    final: { pairs: final.pairs, winner: final.winners[0], scores: final.scores, extras: final.extras },
     lastSyncAt: groupResult.lastSyncAt,
   });
 });
