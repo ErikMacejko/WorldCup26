@@ -95,126 +95,59 @@ async function syncGroupMatches(apiMatches) {
   return ourMatches;
 }
 
-// For R16+ rounds: map each API match to its correct bracket slot by looking
-// up one of its teams in the prev-round slot map (team → prev-round index).
-// Each R16 slot i receives the two winners from R32 slots 2i and 2i+1, so
-// floor(prevSlot/2) gives the current-round slot. Matches with no known team
-// (still TBD) fall back to date order for the remaining empty slots.
-function orderByBracketSlot(stageApiMatches, prevTeamSlotMap, count) {
-  const result = new Array(count).fill(null);
-  const unplaced = [];
-
-  for (const am of stageApiMatches) {
-    const home = am.homeTeam || null;
-    const away = am.awayTeam || null;
-    const prevSlot = prevTeamSlotMap.get(home) ?? prevTeamSlotMap.get(away);
-
-    if (prevSlot != null) {
-      const slot = Math.floor(prevSlot / 2);
-      if (!result[slot]) result[slot] = am;
-    } else {
-      unplaced.push(am);
-    }
-  }
-
-  unplaced.sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
-  let ui = 0;
-  for (let i = 0; i < count; i++) {
-    if (!result[i] && ui < unplaced.length) result[i] = unplaced[ui++];
-  }
-  return result;
-}
-
-// matchNumber ranges of the previous knockout round, used to build the
-// team→slot map for R16+ bracket-slot ordering.
-const PREV_ROUND = {
-  LAST_16:       { start: 73, end: 88 },
-  QUARTER_FINALS:{ start: 89, end: 96 },
-  SEMI_FINALS:   { start: 97, end: 100 },
-};
-
 // Knockout team assignments + results (matchNumber 73-104).
-// R32: sort both API and our matches by date (seed dates were placeholders,
-//   API dates get written back each run).
-// R16/QF/SF: derive the correct bracket slot from our own DB records of the
-//   previous round (sorted by matchNumber = visual display order). This
-//   correctly maps each team to floor(prevMatchIndex/2) regardless of what
-//   date the API scheduled their next match on.
-// Third-place/Final: only one match each, date sort is fine.
+// R32: sort API by date, our matches by kickoff (needed because seed matches
+//   85-88 have 16:00 UTC kickoffs but matchNumbers after 77-84).
+// R16+: sort API by id — football-data.org assigns knockout IDs in
+//   bracket-position order, so this maps API slots to our matchNumber slots
+//   correctly without guessing the schedule. Always write homeTeam/awayTeam
+//   (using 'TBD' when the API hasn't set them yet) so stale values from
+//   previous syncs are cleared immediately.
 async function syncKnockout(apiMatches) {
   for (const { api, start, end } of KNOCKOUT_STAGES) {
-    const count = end - start + 1;
     const stageApiMatches = apiMatches.filter((m) => m.stage === api);
 
-    let orderedApiMatches;
-    let matchSort;
+    const isR32 = api === 'LAST_32';
+    const ordered = isR32
+      ? [...stageApiMatches].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
+      : [...stageApiMatches].sort((a, b) => a.id - b.id);
 
-    const prevRange = PREV_ROUND[api];
-    if (!prevRange) {
-      // R32, THIRD_PLACE, FINAL: date order
-      orderedApiMatches = [...stageApiMatches].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
-      matchSort = { kickoff: 1, matchNumber: 1 };
-    } else {
-      // R16/QF/SF: look up each team in our DB records for the previous
-      // round (matchNumber order = visual bracket order) to find the correct
-      // current-round slot.
-      const prevDbMatches = await Match.find({
-        matchNumber: { $gte: prevRange.start, $lte: prevRange.end },
-      }).sort({ matchNumber: 1 });
-
-      const prevTeamSlotMap = new Map();
-      for (let i = 0; i < prevDbMatches.length; i++) {
-        const m = prevDbMatches[i];
-        if (m.homeTeam && m.homeTeam !== 'TBD') prevTeamSlotMap.set(m.homeTeam, i);
-        if (m.awayTeam && m.awayTeam !== 'TBD') prevTeamSlotMap.set(m.awayTeam, i);
-      }
-
-      orderedApiMatches = orderByBracketSlot(stageApiMatches, prevTeamSlotMap, count);
-      matchSort = { matchNumber: 1 };
-    }
-
+    const matchSort = isR32 ? { kickoff: 1, matchNumber: 1 } : { matchNumber: 1 };
     const ourMatches = await Match.find({ matchNumber: { $gte: start, $lte: end } }).sort(matchSort);
 
     for (let i = 0; i < ourMatches.length; i++) {
-      const am = orderedApiMatches[i];
+      const am = ordered[i];
       const match = ourMatches[i];
+      if (!am) continue;
 
       let changed = false;
 
-      if (am) {
-        if (am.homeTeam && match.homeTeam !== am.homeTeam) {
-          match.homeTeam = am.homeTeam;
+      const newHome = am.homeTeam || 'TBD';
+      const newAway = am.awayTeam || 'TBD';
+      if (match.homeTeam !== newHome) { match.homeTeam = newHome; changed = true; }
+      if (match.awayTeam !== newAway) { match.awayTeam = newAway; changed = true; }
+
+      if (am.utcDate) {
+        const newKickoff = new Date(am.utcDate);
+        if (match.kickoff.getTime() !== newKickoff.getTime()) {
+          match.kickoff = newKickoff;
           changed = true;
         }
-        if (am.awayTeam && match.awayTeam !== am.awayTeam) {
-          match.awayTeam = am.awayTeam;
-          changed = true;
-        }
-        if (am.utcDate) {
-          const newKickoff = new Date(am.utcDate);
-          if (match.kickoff.getTime() !== newKickoff.getTime()) {
-            match.kickoff = newKickoff;
+      }
+
+      if (am.status === 'FINISHED') {
+        const result = resultFromScore(am.score);
+        if (result) {
+          const resultChanged =
+            match.result?.home !== result.home ||
+            match.result?.away !== result.away ||
+            match.result?.penaltyWinner !== result.penaltyWinner;
+          if (resultChanged || match.status !== 'finished') {
+            match.result = result;
+            match.status = 'finished';
             changed = true;
           }
         }
-        if (am.status === 'FINISHED') {
-          const result = resultFromScore(am.score);
-          if (result) {
-            const resultChanged =
-              match.result?.home !== result.home ||
-              match.result?.away !== result.away ||
-              match.result?.penaltyWinner !== result.penaltyWinner;
-            if (resultChanged || match.status !== 'finished') {
-              match.result = result;
-              match.status = 'finished';
-              changed = true;
-            }
-          }
-        }
-      } else if (prevRange) {
-        // R16+ slot with no API match yet: reset incorrectly-assigned teams to TBD
-        if (match.homeTeam !== 'TBD') { match.homeTeam = 'TBD'; changed = true; }
-        if (match.awayTeam !== 'TBD') { match.awayTeam = 'TBD'; changed = true; }
       }
 
       if (changed) {
